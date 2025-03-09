@@ -4,6 +4,7 @@ import cors from 'cors';
 import connectDB from './db.js';
 import dotenv from 'dotenv';
 dotenv.config();
+
 // Import routes
 import userRoutes from './routes/user.js';
 import eventRoutes from './routes/event.js';
@@ -11,6 +12,7 @@ import paymentRoutes from './routes/payment.js';
 import notificationRoutes from './routes/notification.js';
 import registrationRoutes from './routes/registration.js';
 import calendarRoutes from './routes/calendar.js';
+import swaggerRoutes from './swagger.js';
 
 const app = express();
 const port = process.env.PORT || 3000;
@@ -26,9 +28,13 @@ app.use('/api/payments', paymentRoutes);
 app.use('/api/notifications', notificationRoutes);
 app.use('/api/registrations', registrationRoutes);
 app.use('/api/calendars', calendarRoutes);
+app.use('/', swaggerRoutes); // Swagger documentation route
 
 // Connect to MongoDB
-app.listen(port, ()=>{
-    connectDB()
-})
+connectDB();
+
+// Start the server
+app.listen(port, () => {
+    console.log(`Server is running on port ${port}`);
+});
 

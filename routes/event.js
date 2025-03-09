@@ -6,7 +6,63 @@ import {auth, restrictTo} from '../middleware/auth.js';
 
 const router = express.Router();
 
-// Create a new event
+/**
+ * @swagger
+ * tags:
+ *   name: Events
+ *   description: Event management endpoints
+ */
+
+/**
+ * @swagger
+ * /api/events:
+ *   post:
+ *     summary: Create a new event
+ *     tags: [Events]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - title
+ *               - startDateTime
+ *               - endDateTime
+ *               - location
+ *             properties:
+ *               title:
+ *                 type: string
+ *               description:
+ *                 type: string
+ *               startDateTime:
+ *                 type: string
+ *                 format: date-time
+ *               endDateTime:
+ *                 type: string
+ *                 format: date-time
+ *               location:
+ *                 type: string
+ *               visibility:
+ *                 type: string
+ *                 enum: [public, private]
+ *               status:
+ *                 type: string
+ *                 enum: [upcoming, ongoing, completed, canceled]
+ *               isPaid:
+ *                 type: boolean
+ *     responses:
+ *       201:
+ *         description: Event created successfully
+ *       400:
+ *         description: Bad request
+ *       401:
+ *         description: Unauthorized
+ *       403:
+ *         description: Forbidden
+ */
 router.post('/', auth, restrictTo(['admin', 'organizer']), async (req, res) => {
     try {
         const event = new Event({
@@ -41,7 +97,18 @@ router.post('/', auth, restrictTo(['admin', 'organizer']), async (req, res) => {
     }
 });
 
-// Get all events
+/**
+ * @swagger
+ * /api/events:
+ *   get:
+ *     summary: Get all events
+ *     tags: [Events]
+ *     responses:
+ *       200:
+ *         description: List of events
+ *       500:
+ *         description: Server error
+ */
 router.get('/', async (req, res) => {
     try {
         const events = await Event.find({});
@@ -51,7 +118,27 @@ router.get('/', async (req, res) => {
     }
 });
 
-// Get an event by ID
+/**
+ * @swagger
+ * /api/events/{id}:
+ *   get:
+ *     summary: Get an event by ID
+ *     tags: [Events]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Event ID
+ *     responses:
+ *       200:
+ *         description: Event details
+ *       404:
+ *         description: Event not found
+ *       500:
+ *         description: Server error
+ */
 router.get('/:id', async (req, res) => {
     try {
         const event = await Event.findById(req.params.id);
@@ -64,10 +151,61 @@ router.get('/:id', async (req, res) => {
     }
 });
 
-// Update an event by ID
-router.patch('/:id', async (req, res) => {
+/**
+ * @swagger
+ * /api/events/{id}:
+ *   patch:
+ *     summary: Update an event by ID
+ *     tags: [Events]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Event ID
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               title:
+ *                 type: string
+ *               description:
+ *                 type: string
+ *               startDateTime:
+ *                 type: string
+ *                 format: date-time
+ *               endDateTime:
+ *                 type: string
+ *                 format: date-time
+ *               location:
+ *                 type: string
+ *               visibility:
+ *                 type: string
+ *                 enum: [public, private]
+ *               status:
+ *                 type: string
+ *                 enum: [upcoming, ongoing, completed, canceled]
+ *               isPaid:
+ *                 type: boolean
+ *     responses:
+ *       200:
+ *         description: Event updated successfully
+ *       400:
+ *         description: Invalid updates
+ *       404:
+ *         description: Event not found
+ *       500:
+ *         description: Server error
+ */
+router.patch('/:id', auth, restrictTo(['admin', 'organizer']), async (req, res) => {
     const updates = Object.keys(req.body);
-    const allowedUpdates = ['title', 'description', 'organizer', 'startDateTime', 'endDateTime', 'location', 'visibility', 'status']; // Adjust fields as necessary
+    const allowedUpdates = ['title', 'description', 'startDateTime', 'endDateTime', 'location', 'visibility', 'status', 'isPaid'];
     const isValidOperation = updates.every((update) => allowedUpdates.includes(update));
 
     if (!isValidOperation) {
@@ -88,8 +226,30 @@ router.patch('/:id', async (req, res) => {
     }
 });
 
-// Delete an event by ID
-router.delete('/:id', async (req, res) => {
+/**
+ * @swagger
+ * /api/events/{id}:
+ *   delete:
+ *     summary: Delete an event by ID
+ *     tags: [Events]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Event ID
+ *     responses:
+ *       200:
+ *         description: Event deleted successfully
+ *       404:
+ *         description: Event not found
+ *       500:
+ *         description: Server error
+ */
+router.delete('/:id', auth, restrictTo(['admin', 'organizer']), async (req, res) => {
     try {
         const event = await Event.findByIdAndDelete(req.params.id);
         if (!event) {
