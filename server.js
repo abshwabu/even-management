@@ -59,8 +59,13 @@ uploadDirs.forEach(dir => {
 // Connect to MongoDB
 connectDB();
 
+// Add a health check endpoint
+app.get('/health', (req, res) => {
+    res.status(200).send('OK');
+});
+
 // Start the server
-app.listen(port, () => {
+app.listen(port, '0.0.0.0', () => {
     console.log(`Server is running on port ${port}`);
 });
 
