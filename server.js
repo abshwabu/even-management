@@ -57,7 +57,10 @@ uploadDirs.forEach(dir => {
 });
 
 // Connect to MongoDB
-connectDB();
+connectDB().catch(err => {
+    console.error('Failed to connect to database:', err);
+    // Continue running the server even if DB connection fails
+});
 
 // Add a health check endpoint
 app.get('/health', (req, res) => {
