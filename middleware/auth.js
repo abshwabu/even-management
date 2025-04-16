@@ -5,7 +5,8 @@ const auth = async (req, res, next) => {
     try {
         const token = req.header('Authorization').replace('Bearer ', '');
         const decoded = jwt.verify(token, process.env.JWT_SECRET);
-        const user = await User.findOne({ _id: decoded.userId });
+        // Use Sequelize's where clause to find the user
+        const user = await User.findOne({ where: { id: decoded.userId } });
 
         if (!user) {
             throw new Error();
@@ -18,8 +19,6 @@ const auth = async (req, res, next) => {
     }
 };
 
-
-
 const restrictTo = (roles) => {
     return (req, res, next) => {
         if (!roles.includes(req.user.role)) {
@@ -29,4 +28,4 @@ const restrictTo = (roles) => {
     };
 };
 
-export  {restrictTo, auth};
+export { restrictTo, auth };

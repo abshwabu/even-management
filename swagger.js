@@ -14,7 +14,7 @@ const options = {
         },
         servers: [
             {
-                url: 'https://event-management-zk4x.onrender.com',
+                url: 'http://localhost:3000',
             },
         ],
         components: {

@@ -1,5 +1,12 @@
 import express from 'express';
-import Notification from '../models/Notification.js';
+import { auth } from '../middleware/auth.js';
+import {
+    getAllNotifications,
+    getNotificationById,
+    createNotification,
+    updateNotification,
+    deleteNotification
+} from '../controllers/notificationController.js';
 
 const router = express.Router();
 
@@ -23,11 +30,11 @@ const router = express.Router();
  *           schema:
  *             type: object
  *             required:
- *               - user
+ *               - userId
  *               - message
  *             properties:
- *               user:
- *                 type: string
+ *               userId:
+ *                 type: integer
  *               message:
  *                 type: string
  *               isRead:
@@ -38,15 +45,7 @@ const router = express.Router();
  *       400:
  *         description: Bad request
  */
-router.post('/', async (req, res) => {
-    try {
-        const notification = new Notification(req.body);
-        await notification.save();
-        res.status(201).send(notification);
-    } catch (error) {
-        res.status(400).send(error);
-    }
-});
+router.post('/', createNotification);
 
 /**
  * @swagger
@@ -60,14 +59,7 @@ router.post('/', async (req, res) => {
  *       500:
  *         description: Server error
  */
-router.get('/', async (req, res) => {
-    try {
-        const notifications = await Notification.find({});
-        res.status(200).send(notifications);
-    } catch (error) {
-        res.status(500).send(error);
-    }
-});
+router.get('/', getAllNotifications);
 
 /**
  * @swagger
@@ -90,17 +82,7 @@ router.get('/', async (req, res) => {
  *       500:
  *         description: Server error
  */
-router.get('/:id', async (req, res) => {
-    try {
-        const notification = await Notification.findById(req.params.id);
-        if (!notification) {
-            return res.status(404).send();
-        }
-        res.status(200).send(notification);
-    } catch (error) {
-        res.status(500).send(error);
-    }
-});
+router.get('/:id', getNotificationById);
 
 /**
  * @swagger
@@ -136,28 +118,7 @@ router.get('/:id', async (req, res) => {
  *       500:
  *         description: Server error
  */
-router.patch('/:id', async (req, res) => {
-    const updates = Object.keys(req.body);
-    const allowedUpdates = ['message', 'isRead'];
-    const isValidOperation = updates.every((update) => allowedUpdates.includes(update));
-
-    if (!isValidOperation) {
-        return res.status(400).send({ error: 'Invalid updates!' });
-    }
-
-    try {
-        const notification = await Notification.findById(req.params.id);
-        if (!notification) {
-            return res.status(404).send();
-        }
-
-        updates.forEach((update) => notification[update] = req.body[update]);
-        await notification.save();
-        res.status(200).send(notification);
-    } catch (error) {
-        res.status(400).send(error);
-    }
-});
+router.patch('/:id', updateNotification);
 
 /**
  * @swagger
@@ -180,16 +141,6 @@ router.patch('/:id', async (req, res) => {
  *       500:
  *         description: Server error
  */
-router.delete('/:id', async (req, res) => {
-    try {
-        const notification = await Notification.findByIdAndDelete(req.params.id);
-        if (!notification) {
-            return res.status(404).send();
-        }
-        res.status(200).send(notification);
-    } catch (error) {
-        res.status(500).send(error);
-    }
-});
+router.delete('/:id', deleteNotification);
 
 export default router;

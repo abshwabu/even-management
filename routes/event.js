@@ -1,8 +1,14 @@
 import express from 'express';
-import Event from '../models/Event.js';
-import Calendar from '../models/Calendar.js';
-import Notification from '../models/Notification.js';
-import {auth, restrictTo} from '../middleware/auth.js';
+import { auth, restrictTo } from '../middleware/auth.js';
+import upload from '../middleware/upload.js';
+import pagination from '../middleware/pagination.js';
+import {
+    getAllEvents,
+    getEventById,
+    createEvent,
+    updateEvent,
+    deleteEvent
+} from '../controllers/eventController.js';
 
 const router = express.Router();
 
@@ -24,14 +30,14 @@ const router = express.Router();
  *     requestBody:
  *       required: true
  *       content:
- *         application/json:
+ *         multipart/form-data:
  *           schema:
  *             type: object
  *             required:
  *               - title
+ *               - description
  *               - startDateTime
  *               - endDateTime
- *               - location
  *             properties:
  *               title:
  *                 type: string
@@ -43,59 +49,43 @@ const router = express.Router();
  *               endDateTime:
  *                 type: string
  *                 format: date-time
+ *               mainImage:
+ *                 type: string
+ *                 format: binary
+ *               images:
+ *                 type: array
+ *                 items:
+ *                   type: string
+ *                   format: binary
  *               location:
  *                 type: string
- *               visibility:
- *                 type: string
- *                 enum: [public, private]
- *               status:
- *                 type: string
- *                 enum: [upcoming, ongoing, completed, canceled]
+ *               capacity:
+ *                 type: integer
  *               isPaid:
  *                 type: boolean
+ *               price:
+ *                 type: number
+ *               category:
+ *                 type: string
+ *               isRecurring:
+ *                 type: boolean
+ *               recurrencePattern:
+ *                 type: string
+ *                 enum: [daily, weekly, monthly, yearly, none]
  *     responses:
  *       201:
  *         description: Event created successfully
- *       400:
- *         description: Bad request
  *       401:
- *         description: Unauthorized
- *       403:
- *         description: Forbidden
+ *         description: Authentication required
+ *       400:
+ *         description: Invalid input
  */
-router.post('/', auth, restrictTo(['admin', 'organizer']), async (req, res) => {
-    try {
-        const event = new Event({
-            ...req.body,
-            organizer: req.user._id
-        });
-        await event.save();
+const uploadFields = upload.fields([
+    { name: 'mainImage', maxCount: 1 },
+    { name: 'images', maxCount: 10 }
+]);
 
-        // Create a calendar entry
-        const calendar = new Calendar({
-            event: event._id,
-            startDate: event.startDateTime,
-            endDate: event.endDateTime,
-            startTime: event.startDateTime.toTimeString().split(' ')[0],
-            endTime: event.endDateTime.toTimeString().split(' ')[0],
-            isRecurring: event.isRecurring,
-            recurrencePattern: event.recurrencePattern
-        });
-        await calendar.save();
-
-        // Create a notification
-        const notification = new Notification({
-            user: event.organizer,
-            message: `There is a new event: ${event.title}`,
-            isRead: false
-        });
-        await notification.save();
-
-        res.status(201).send(event);
-    } catch (error) {
-        res.status(400).send(error);
-    }
-});
+router.post('/', auth, restrictTo(['admin', 'organizer']), uploadFields, createEvent);
 
 /**
  * @swagger
@@ -103,20 +93,45 @@ router.post('/', auth, restrictTo(['admin', 'organizer']), async (req, res) => {
  *   get:
  *     summary: Get all events
  *     tags: [Events]
+ *     parameters:
+ *       - in: query
+ *         name: status
+ *         schema:
+ *           type: string
+ *           enum: [upcoming, ongoing, completed, canceled]
+ *         description: Filter by status
+ *       - in: query
+ *         name: category
+ *         schema:
+ *           type: string
+ *         description: Filter by category
+ *       - in: query
+ *         name: isActive
+ *         schema:
+ *           type: boolean
+ *         description: Filter by active status
+ *       - in: query
+ *         name: page
+ *         schema:
+ *           type: integer
+ *           minimum: 1
+ *           default: 1
+ *         description: Page number
+ *       - in: query
+ *         name: limit
+ *         schema:
+ *           type: integer
+ *           minimum: 1
+ *           maximum: 100
+ *           default: 10
+ *         description: Number of items per page
  *     responses:
  *       200:
- *         description: List of events
+ *         description: List of events with pagination
  *       500:
  *         description: Server error
  */
-router.get('/', async (req, res) => {
-    try {
-        const events = await Event.find({});
-        res.status(200).send(events);
-    } catch (error) {
-        res.status(500).send(error);
-    }
-});
+router.get('/', pagination, getAllEvents);
 
 /**
  * @swagger
@@ -139,37 +154,32 @@ router.get('/', async (req, res) => {
  *       500:
  *         description: Server error
  */
-router.get('/:id', async (req, res) => {
-    try {
-        const event = await Event.findById(req.params.id);
-        if (!event) {
-            return res.status(404).send();
-        }
-        res.status(200).send(event);
-    } catch (error) {
-        res.status(500).send(error);
-    }
-});
+router.get('/:id', getEventById);
 
 /**
  * @swagger
  * /api/events/{id}:
- *   patch:
- *     summary: Update an event by ID
+ *   put:
  *     tags: [Events]
  *     security:
  *       - bearerAuth: []
+ *     summary: Update an event
  *     parameters:
  *       - in: path
  *         name: id
  *         required: true
  *         schema:
- *           type: string
+ *           type: integer
  *         description: Event ID
+ *       - in: query
+ *         name: append
+ *         schema:
+ *           type: boolean
+ *         description: If true, append new images to existing ones
  *     requestBody:
  *       required: true
  *       content:
- *         application/json:
+ *         multipart/form-data:
  *           schema:
  *             type: object
  *             properties:
@@ -183,82 +193,57 @@ router.get('/:id', async (req, res) => {
  *               endDateTime:
  *                 type: string
  *                 format: date-time
+ *               mainImage:
+ *                 type: string
+ *                 format: binary
+ *               images:
+ *                 type: array
+ *                 items:
+ *                   type: string
+ *                   format: binary
  *               location:
  *                 type: string
- *               visibility:
+ *               capacity:
+ *                 type: integer
+ *               category:
  *                 type: string
- *                 enum: [public, private]
- *               status:
- *                 type: string
- *                 enum: [upcoming, ongoing, completed, canceled]
- *               isPaid:
- *                 type: boolean
  *     responses:
  *       200:
  *         description: Event updated successfully
- *       400:
- *         description: Invalid updates
+ *       401:
+ *         description: Authentication required
+ *       403:
+ *         description: Not authorized to edit this event
  *       404:
  *         description: Event not found
- *       500:
- *         description: Server error
  */
-router.patch('/:id', auth, restrictTo(['admin', 'organizer']), async (req, res) => {
-    const updates = Object.keys(req.body);
-    const allowedUpdates = ['title', 'description', 'startDateTime', 'endDateTime', 'location', 'visibility', 'status', 'isPaid'];
-    const isValidOperation = updates.every((update) => allowedUpdates.includes(update));
-
-    if (!isValidOperation) {
-        return res.status(400).send({ error: 'Invalid updates!' });
-    }
-
-    try {
-        const event = await Event.findById(req.params.id);
-        if (!event) {
-            return res.status(404).send();
-        }
-
-        updates.forEach((update) => event[update] = req.body[update]);
-        await event.save();
-        res.status(200).send(event);
-    } catch (error) {
-        res.status(400).send(error);
-    }
-});
+router.put('/:id', auth, restrictTo(['admin', 'organizer']), uploadFields, updateEvent);
 
 /**
  * @swagger
  * /api/events/{id}:
  *   delete:
- *     summary: Delete an event by ID
  *     tags: [Events]
  *     security:
  *       - bearerAuth: []
+ *     summary: Delete an event
  *     parameters:
  *       - in: path
  *         name: id
  *         required: true
  *         schema:
- *           type: string
+ *           type: integer
  *         description: Event ID
  *     responses:
  *       200:
  *         description: Event deleted successfully
+ *       401:
+ *         description: Authentication required
+ *       403:
+ *         description: Not authorized to delete this event
  *       404:
  *         description: Event not found
- *       500:
- *         description: Server error
  */
-router.delete('/:id', auth, restrictTo(['admin', 'organizer']), async (req, res) => {
-    try {
-        const event = await Event.findByIdAndDelete(req.params.id);
-        if (!event) {
-            return res.status(404).send();
-        }
-        res.status(200).send(event);
-    } catch (error) {
-        res.status(500).send(error);
-    }
-});
+router.delete('/:id', auth, restrictTo(['admin', 'organizer']), deleteEvent);
 
 export default router;

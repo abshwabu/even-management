@@ -1,13 +1,17 @@
-import mongoose from 'mongoose';
+import sequelize from './config/database.js';
 
 const connectDB = async () => {
     try {
-        await mongoose.connect(process.env.MONGO_URI);
-        console.log('MongoDB connected...');
-    } catch (err) {
-        console.error('MongoDB connection error:', err);
-        process.exit(1); // Exit process with failure
+        await sequelize.authenticate();
+        console.log('Postgres connected via Sequelize...');
+        
+        // Force recreate tables - WARNING: This will delete all data
+        await sequelize.sync({ force: true });
+        console.log('Database synchronized');
+    } catch (error) {
+        console.error('Sequelize connection error:', error);
+        process.exit(1);
     }
 };
 
-export default connectDB;
+export { connectDB, sequelize };

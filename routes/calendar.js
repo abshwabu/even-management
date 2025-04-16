@@ -1,5 +1,12 @@
 import express from 'express';
-import Calendar from '../models/Calendar.js';
+import { auth } from '../middleware/auth.js';
+import {
+    getAllCalendars,
+    getCalendarById,
+    createCalendar,
+    updateCalendar,
+    deleteCalendar
+} from '../controllers/calendarController.js';
 
 const router = express.Router();
 
@@ -13,58 +20,6 @@ const router = express.Router();
 /**
  * @swagger
  * /api/calendars:
- *   post:
- *     summary: Create a new calendar entry
- *     tags: [Calendars]
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             required:
- *               - event
- *               - startDate
- *               - endDate
- *               - startTime
- *               - endTime
- *             properties:
- *               event:
- *                 type: string
- *               startDate:
- *                 type: string
- *                 format: date
- *               endDate:
- *                 type: string
- *                 format: date
- *               startTime:
- *                 type: string
- *               endTime:
- *                 type: string
- *               isRecurring:
- *                 type: boolean
- *               recurrencePattern:
- *                 type: string
- *                 enum: [daily, weekly, monthly, yearly, none]
- *     responses:
- *       201:
- *         description: Calendar entry created successfully
- *       400:
- *         description: Bad request
- */
-router.post('/', async (req, res) => {
-    try {
-        const calendar = new Calendar(req.body);
-        await calendar.save();
-        res.status(201).send(calendar);
-    } catch (error) {
-        res.status(400).send(error);
-    }
-});
-
-/**
- * @swagger
- * /api/calendars:
  *   get:
  *     summary: Get all calendar entries
  *     tags: [Calendars]
@@ -74,14 +29,7 @@ router.post('/', async (req, res) => {
  *       500:
  *         description: Server error
  */
-router.get('/', async (req, res) => {
-    try {
-        const calendars = await Calendar.find({});
-        res.status(200).send(calendars);
-    } catch (error) {
-        res.status(500).send(error);
-    }
-});
+router.get('/', getAllCalendars);
 
 /**
  * @swagger
@@ -101,41 +49,28 @@ router.get('/', async (req, res) => {
  *         description: Calendar entry details
  *       404:
  *         description: Calendar entry not found
- *       500:
- *         description: Server error
  */
-router.get('/:id', async (req, res) => {
-    try {
-        const calendar = await Calendar.findById(req.params.id);
-        if (!calendar) {
-            return res.status(404).send();
-        }
-        res.status(200).send(calendar);
-    } catch (error) {
-        res.status(500).send(error);
-    }
-});
+router.get('/:id', getCalendarById);
 
 /**
  * @swagger
- * /api/calendars/{id}:
- *   patch:
- *     summary: Update a calendar entry by ID
+ * /api/calendars:
+ *   post:
+ *     summary: Create a new calendar entry
  *     tags: [Calendars]
- *     parameters:
- *       - in: path
- *         name: id
- *         required: true
- *         schema:
- *           type: string
- *         description: Calendar entry ID
  *     requestBody:
  *       required: true
  *       content:
  *         application/json:
  *           schema:
  *             type: object
+ *             required:
+ *               - eventId
+ *               - startDate
+ *               - endDate
  *             properties:
+ *               eventId:
+ *                 type: integer
  *               startDate:
  *                 type: string
  *                 format: date
@@ -152,43 +87,16 @@ router.get('/:id', async (req, res) => {
  *                 type: string
  *                 enum: [daily, weekly, monthly, yearly, none]
  *     responses:
- *       200:
- *         description: Calendar entry updated successfully
- *       400:
- *         description: Invalid updates
- *       404:
- *         description: Calendar entry not found
- *       500:
- *         description: Server error
+ *       201:
+ *         description: Calendar entry created successfully
  */
-router.patch('/:id', async (req, res) => {
-    const updates = Object.keys(req.body);
-    const allowedUpdates = ['startDate', 'endDate', 'startTime', 'endTime', 'isRecurring', 'recurrencePattern'];
-    const isValidOperation = updates.every((update) => allowedUpdates.includes(update));
-
-    if (!isValidOperation) {
-        return res.status(400).send({ error: 'Invalid updates!' });
-    }
-
-    try {
-        const calendar = await Calendar.findById(req.params.id);
-        if (!calendar) {
-            return res.status(404).send();
-        }
-
-        updates.forEach((update) => calendar[update] = req.body[update]);
-        await calendar.save();
-        res.status(200).send(calendar);
-    } catch (error) {
-        res.status(400).send(error);
-    }
-});
+router.post('/', createCalendar);
 
 /**
  * @swagger
  * /api/calendars/{id}:
- *   delete:
- *     summary: Delete a calendar entry by ID
+ *   patch:
+ *     summary: Update a calendar entry
  *     tags: [Calendars]
  *     parameters:
  *       - in: path
@@ -196,25 +104,41 @@ router.patch('/:id', async (req, res) => {
  *         required: true
  *         schema:
  *           type: string
- *         description: Calendar entry ID
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               startDate:
+ *                 type: string
+ *                 format: date
+ *               endDate:
+ *                 type: string
+ *                 format: date
+ *     responses:
+ *       200:
+ *         description: Calendar entry updated successfully
+ */
+router.patch('/:id', updateCalendar);
+
+/**
+ * @swagger
+ * /api/calendars/{id}:
+ *   delete:
+ *     summary: Delete a calendar entry
+ *     tags: [Calendars]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
  *     responses:
  *       200:
  *         description: Calendar entry deleted successfully
- *       404:
- *         description: Calendar entry not found
- *       500:
- *         description: Server error
  */
-router.delete('/:id', async (req, res) => {
-    try {
-        const calendar = await Calendar.findByIdAndDelete(req.params.id);
-        if (!calendar) {
-            return res.status(404).send();
-        }
-        res.status(200).send(calendar);
-    } catch (error) {
-        res.status(500).send(error);
-    }
-});
+router.delete('/:id', deleteCalendar);
 
 export default router;

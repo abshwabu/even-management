@@ -6,8 +6,8 @@ const signup = async (req, res) => {
     try {
         const { name, email, password, phone, role } = req.body;
 
-        // Check if the user already exists
-        const existingUser = await User.findOne({ email });
+        // Check if the user already exists using Sequelize's where clause
+        const existingUser = await User.findOne({ where: { email } });
         if (existingUser) {
             return res.status(400).send({ error: 'User already exists' });
         }
@@ -15,19 +15,17 @@ const signup = async (req, res) => {
         // Hash the password
         const hashedPassword = await bcrypt.hash(password, 10);
 
-        // Create a new user
-        const user = new User({
+        // Create a new user using Sequelize's create method
+        const user = await User.create({
             name,
             email,
             password: hashedPassword,
             phone,
-            role
+            role,
         });
 
-        await user.save();
-
-        // Generate a JWT token
-        const token = jwt.sign({ userId: user._id }, process.env.JWT_SECRET, { expiresIn: '100h' });
+        // Generate a JWT token using the user's id (Sequelize uses id, not _id)
+        const token = jwt.sign({ userId: user.id }, process.env.JWT_SECRET, { expiresIn: '100h' });
 
         res.status(201).send({ user, token });
     } catch (error) {
@@ -40,7 +38,7 @@ const login = async (req, res) => {
         const { email, password } = req.body;
 
         // Check if the user exists
-        const user = await User.findOne({ email });
+        const user = await User.findOne({ where: { email } });
         if (!user) {
             return res.status(400).send({ error: 'Invalid email or password' });
         }
@@ -51,8 +49,8 @@ const login = async (req, res) => {
             return res.status(400).send({ error: 'Invalid email or password' });
         }
 
-        // Generate a JWT token
-        const token = jwt.sign({ userId: user._id }, process.env.JWT_SECRET, { expiresIn: '1h' });
+        // Generate a JWT token using user id
+        const token = jwt.sign({ userId: user.id }, process.env.JWT_SECRET, { expiresIn: '1h' });
 
         res.status(200).send({ user, token });
     } catch (error) {

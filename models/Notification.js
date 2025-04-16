@@ -1,10 +1,32 @@
-import mongoose from "mongoose";
+import { DataTypes } from 'sequelize';
+import sequelize from '../config/database.js';
 
-const notificationSchema = new mongoose.Schema({
-    user: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true },
-    message: { type: String, required: true },
-    isRead: { type: Boolean, default: false },
-    createdAt: { type: Date, default: Date.now }
+const Notification = sequelize.define('Notification', {
+    userId: {
+        type: DataTypes.INTEGER,
+        allowNull: false,
+        references: {
+            model: 'Users', // Ensure this matches your Users table name
+            key: 'id',
+        },
+    },
+    message: {
+        type: DataTypes.STRING,
+        allowNull: false,
+    },
+    isRead: {
+        type: DataTypes.BOOLEAN,
+        allowNull: false,
+        defaultValue: false,
+    },
+    createdAt: {
+        type: DataTypes.DATE,
+        allowNull: false,
+        defaultValue: DataTypes.NOW,
+    },
+}, {
+    updatedAt: false, // Disable updatedAt if not required
+    tableName: 'Notifications',
 });
 
-export default mongoose.model("Notification", notificationSchema);
+export default Notification;
