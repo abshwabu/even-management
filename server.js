@@ -41,6 +41,12 @@ app.use(cors({
 // Add OPTIONS handling for preflight requests
 app.options('*', cors());
 
+// Add this before your routes
+app.use((req, res, next) => {
+  console.log(`${new Date().toISOString()} - ${req.method} ${req.url}`);
+  next();
+});
+
 // Use routes
 app.use('/api/users', userRoutes);
 app.use('/api/events', eventRoutes);
@@ -75,6 +81,30 @@ connectDB().catch(err => {
 // Add a health check endpoint
 app.get('/health', (req, res) => {
     res.status(200).send('OK');
+});
+
+// Add this before your other routes
+app.get('/api/test', (req, res) => {
+  try {
+    res.status(200).json({ message: 'API is working correctly' });
+  } catch (error) {
+    console.error('Test route error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Add this after your routes but before app.listen
+app.use((err, req, res, next) => {
+  console.error('Error:', err.stack);
+  res.status(500).json({
+    error: err.message || 'Something went wrong on the server',
+    stack: process.env.NODE_ENV === 'production' ? '🥞' : err.stack
+  });
+});
+
+// Make sure all routes that don't exist return 404
+app.use((req, res) => {
+  res.status(404).json({ error: 'Route not found' });
 });
 
 // Start the server

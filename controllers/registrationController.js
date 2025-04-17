@@ -1,14 +1,21 @@
 import Registration from '../models/Registration.js';
 import Event from '../models/Event.js';
 import initializePayment from '../utils/chapa.js';
+import User from '../models/User.js';
 
 // Get all registrations
 export const getAllRegistrations = async (req, res) => {
     try {
-        const registrations = await Registration.findAll();
-        res.status(200).send(registrations);
+        const registrations = await Registration.findAll({
+            include: [
+                { model: User, as: 'user' },
+                { model: Event, as: 'event' }
+            ]
+        });
+        res.status(200).json(registrations);
     } catch (error) {
-        res.status(500).send({ error: error.message });
+        console.error('Error getting registrations:', error);
+        res.status(500).json({ error: error.message });
     }
 };
 
