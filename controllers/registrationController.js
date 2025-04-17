@@ -45,8 +45,8 @@ export const createRegistration = async (req, res) => {
                 first_name: req.user.name.split(' ')[0],
                 last_name: req.user.name.split(' ')[1] || '',
                 tx_ref: `tx-${Date.now()}`,
-                callback_url: 'http://localhost:3000/api/registrations/callback',
-                return_url: 'http://localhost:3000/api/registrations/return',
+                callback_url: 'https://event-management-zk4x.onrender.com/api/registrations/callback',
+                return_url: 'https://event-management-zk4x.onrender.com/api/registrations/return',
                 customization: {
                     title: 'Event Registration Payment',
                     description: `Payment for event: ${event.title}`

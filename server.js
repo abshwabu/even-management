@@ -29,7 +29,17 @@ const __dirname = path.dirname(__filename);
 
 // Middleware
 app.use(bodyParser.json());
-app.use(cors());
+
+// Enhanced CORS configuration
+app.use(cors({
+    origin: '*', // Allow all origins in development
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'Accept'],
+    credentials: true
+}));
+
+// Add OPTIONS handling for preflight requests
+app.options('*', cors());
 
 // Use routes
 app.use('/api/users', userRoutes);
