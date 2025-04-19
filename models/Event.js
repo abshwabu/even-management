@@ -24,8 +24,16 @@ const Event = sequelize.define('Event', {
         allowNull: false,
     },
     location: {
-        type: DataTypes.STRING,
+        type: DataTypes.JSON,
         allowNull: true,
+        defaultValue: {
+            city: '',
+            place: '',
+            position: {
+                lat: null,
+                lng: null
+            }
+        }
     },
     organizerId: {
         type: DataTypes.INTEGER,

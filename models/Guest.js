@@ -13,17 +13,16 @@ const Guest = sequelize.define('Guest', {
         type: DataTypes.STRING,
         allowNull: false,
     },
-    // If email doesn't exist in the database, use these fields instead
-    image: {
-        type: DataTypes.STRING,
-        allowNull: true,
-    },
     profession: {
         type: DataTypes.STRING,
         allowNull: true,
     },
-    description: {
-        type: DataTypes.TEXT,
+    membership: {
+        type: DataTypes.STRING,
+        allowNull: true,
+    },
+    image: {
+        type: DataTypes.STRING,
         allowNull: true,
     },
     eventId: {
