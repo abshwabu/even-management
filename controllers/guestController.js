@@ -2,24 +2,24 @@ import Guest from '../models/Guest.js';
 import Event from '../models/Event.js';
 import upload from '../middleware/upload.js';
 
-// Get all guests for an event
-export const getEventGuests = async (req, res) => {
+// Get all guests
+export const getAllGuests = async (req, res) => {
     try {
-        const { eventId } = req.params;
-        
         const guests = await Guest.findAll({
-            where: { eventId },
-            order: [['createdAt', 'ASC']]
+            include: [{ model: Event, as: 'event' }]
         });
-        
         res.status(200).json(guests);
     } catch (error) {
-        res.status(500).json({ message: 'Error fetching guests', error: error.message });
+        console.error('Error getting guests:', error);
+        res.status(500).json({ 
+            message: 'Error fetching guests', 
+            error: error.message 
+        });
     }
 };
 
-// Add a guest to an event
-export const addGuest = async (req, res) => {
+// Get guests by event ID
+export const getGuestsByEventId = async (req, res) => {
     try {
         const { eventId } = req.params;
         
@@ -29,21 +29,54 @@ export const addGuest = async (req, res) => {
             return res.status(404).json({ message: 'Event not found' });
         }
         
-        // Check if user is authorized (event organizer or admin)
-        if (event.organizerId !== req.user.id && req.user.role !== 'admin') {
-            return res.status(403).json({ message: 'Not authorized to add guests to this event' });
+        const guests = await Guest.findAll({
+            where: { eventId },
+            include: [{ model: Event, as: 'event' }]
+        });
+        
+        res.status(200).json(guests);
+    } catch (error) {
+        console.error('Error getting guests by event:', error);
+        res.status(500).json({ 
+            message: 'Error fetching guests for event', 
+            error: error.message 
+        });
+    }
+};
+
+// Create a new guest
+export const createGuest = async (req, res) => {
+    try {
+        const { eventId } = req.params;
+        const { name, profession, description } = req.body;
+        
+        // Check if event exists
+        const event = await Event.findByPk(eventId);
+        if (!event) {
+            return res.status(404).json({ message: 'Event not found' });
         }
         
-        const guestData = {
-            ...req.body,
-            eventId,
-            image: req.file ? `/uploads/guests/${req.file.filename}` : null
-        };
+        // Handle file upload if there's a photo
+        let imagePath = null;
+        if (req.file) {
+            imagePath = `/uploads/guests/${req.file.filename}`;
+        }
         
-        const guest = await Guest.create(guestData);
+        const guest = await Guest.create({
+            name,
+            profession,
+            description,
+            image: imagePath,
+            eventId
+        });
+        
         res.status(201).json(guest);
     } catch (error) {
-        res.status(400).json({ message: 'Error adding guest', error: error.message });
+        console.error('Error creating guest:', error);
+        res.status(400).json({ 
+            message: 'Error creating guest', 
+            error: error.message 
+        });
     }
 };
 

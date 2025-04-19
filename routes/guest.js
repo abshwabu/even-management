@@ -2,8 +2,9 @@ import express from 'express';
 import { auth, restrictTo } from '../middleware/auth.js';
 import upload from '../middleware/upload.js';
 import {
-    getEventGuests,
-    addGuest,
+    getAllGuests,
+    getGuestsByEventId,
+    createGuest,
     updateGuest,
     deleteGuest
 } from '../controllers/guestController.js';
@@ -39,7 +40,7 @@ const guestUpload = upload.single('image');
  *       500:
  *         description: Server error
  */
-router.get('/events/:eventId/guests', getEventGuests);
+router.get('/events/:eventId/guests', getGuestsByEventId);
 
 /**
  * @swagger
@@ -84,7 +85,7 @@ router.get('/events/:eventId/guests', getEventGuests);
  *       404:
  *         description: Event not found
  */
-router.post('/events/:eventId/guests', auth, restrictTo(['admin', 'organizer']), guestUpload, addGuest);
+router.post('/events/:eventId/guests', auth, restrictTo(['admin', 'organizer']), guestUpload, createGuest);
 
 /**
  * @swagger

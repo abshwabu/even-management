@@ -1,11 +1,19 @@
 import { DataTypes } from 'sequelize';
 import sequelize from '../config/database.js';
+// Don't import Event here to avoid circular dependencies
+// import Event from './Event.js';
 
 const Guest = sequelize.define('Guest', {
+    id: {
+        type: DataTypes.INTEGER,
+        primaryKey: true,
+        autoIncrement: true
+    },
     name: {
         type: DataTypes.STRING,
         allowNull: false,
     },
+    // If email doesn't exist in the database, use these fields instead
     image: {
         type: DataTypes.STRING,
         allowNull: true,
@@ -20,12 +28,10 @@ const Guest = sequelize.define('Guest', {
     },
     eventId: {
         type: DataTypes.INTEGER,
-        allowNull: false,
         references: {
             model: 'Events',
             key: 'id'
-        },
-        onDelete: 'CASCADE' // Delete guests when their event is deleted
+        }
     },
     createdAt: {
         type: DataTypes.DATE,
@@ -39,6 +45,11 @@ const Guest = sequelize.define('Guest', {
     }
 }, {
     tableName: 'Guests',
+    timestamps: true
 });
+
+// Don't define associations here - they should be in associations.js
+// Guest.belongsTo(Event, { foreignKey: 'eventId' });
+// Event.hasMany(Guest, { foreignKey: 'eventId' });
 
 export default Guest; 

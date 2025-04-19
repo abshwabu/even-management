@@ -19,11 +19,12 @@ export const getAllEvents = async (req, res) => {
             order: [['startDateTime', 'ASC']],
             limit,
             offset,
-            include: [{
-                model: Guest,
-                as: 'guests',
-                required: false
-            }]
+            include: [
+                {
+                    model: Guest,
+                    as: 'guests'
+                }
+            ]
         });
         
         // Calculate pagination metadata
@@ -41,7 +42,11 @@ export const getAllEvents = async (req, res) => {
             }
         });
     } catch (error) {
-        res.status(500).json({ message: 'Error fetching events', error: error.message });
+        console.error('Error fetching events:', error);
+        res.status(500).json({
+            message: 'Error fetching events',
+            error: error.message
+        });
     }
 };
 

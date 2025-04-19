@@ -14,7 +14,7 @@ const options = {
         },
         servers: [
             {
-                url: process.env.API_URL || 'https://event-management-zk4x.onrender.com/api-docs/',
+                url: process.env.API_URL || 'https://event-management-zk4x.onrender.com',
                 description: 'API Server'
             }
         ],

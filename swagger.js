@@ -19,7 +19,7 @@ const options = {
     },
     servers: [
       {
-        url: 'https://event-management-zk4x.onrender.com/',
+        url: 'https://event-management-zk4x.onrender.com',  // No trailing slash
         description: 'Production server',
       },
     ],
@@ -42,17 +42,25 @@ const options = {
 
 const specs = swaggerJsdoc(options);
 
+// Serve Swagger UI
 router.use('/api-docs', swaggerUi.serve);
-router.get('/api-docs', swaggerUi.setup(specs, {
-  explorer: true,
-  customCss: '.swagger-ui .topbar { display: none }',
-  swaggerOptions: {
-    persistAuthorization: true,
-    tryItOutEnabled: true,
-    displayRequestDuration: true,
-    filter: true,
-  },
-}));
+router.get('/api-docs', (req, res) => {
+  res.setHeader('Content-Type', 'text/html');
+  return res.send(swaggerUi.generateHTML(specs, {
+    explorer: true,
+    customCss: '.swagger-ui .topbar { display: none }',
+    swaggerOptions: {
+      url: '/api-docs/swagger.json',
+      persistAuthorization: true,
+    },
+  }));
+});
+
+// Serve Swagger spec as JSON
+router.get('/api-docs/swagger.json', (req, res) => {
+  res.setHeader('Content-Type', 'application/json');
+  res.send(specs);
+});
 
 // Redirect root to API docs
 router.get('/', (req, res) => {

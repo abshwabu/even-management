@@ -1,4 +1,5 @@
 import sequelize from './config/database.js';
+import associations from './models/associations.js';
 
 const connectDB = async () => {
     try {
@@ -9,10 +10,10 @@ const connectDB = async () => {
         // In production, you might not want to force sync tables
         // as it will delete all existing data
         if (process.env.NODE_ENV === 'development') {
-            await sequelize.sync({ force: true });
-            console.log('Database synchronized (tables recreated)');
+            await sequelize.sync({ alter: true });
+            console.log('Database synchronized (tables altered)');
         } else {
-            // In production, just sync without force
+            // In production, just sync without altering
             await sequelize.sync();
             console.log('Database synchronized (existing tables preserved)');
         }
@@ -26,4 +27,4 @@ const connectDB = async () => {
     }
 };
 
-export { connectDB, sequelize };
+export { connectDB, sequelize, associations };

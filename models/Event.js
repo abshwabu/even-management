@@ -2,6 +2,11 @@ import { DataTypes } from 'sequelize';
 import sequelize from '../config/database.js';
 
 const Event = sequelize.define('Event', {
+    id: {
+        type: DataTypes.INTEGER,
+        primaryKey: true,
+        autoIncrement: true
+    },
     title: {
         type: DataTypes.STRING,
         allowNull: false,
@@ -88,6 +93,10 @@ const Event = sequelize.define('Event', {
     }
 }, {
     tableName: 'Events',
+    timestamps: true
 });
+
+// Note: We'll define associations in associations.js, not here
+// This prevents circular dependency issues
 
 export default Event;

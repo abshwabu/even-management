@@ -58,4 +58,18 @@ const login = async (req, res) => {
     }
 };
 
+// Get all users
+export const getAllUsers = async (req, res, next) => {
+    try {
+        console.log('Getting all users...');
+        const users = await User.findAll();
+        console.log(`Found ${users.length} users`);
+        return res.status(200).json(users);
+    } catch (error) {
+        console.error('Error in getAllUsers:', error);
+        // Pass the error to the error handler middleware
+        return next(error);
+    }
+};
+
 export { signup, login };
