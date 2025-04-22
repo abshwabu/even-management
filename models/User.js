@@ -28,7 +28,7 @@ const User = sequelize.define('User', {
         type: DataTypes.STRING,
     },
     role: {
-        type: DataTypes.ENUM('admin', 'user'),
+        type: DataTypes.ENUM('admin', 'user', 'organizer'),
         defaultValue: 'user'
     },
     isRestricted: {
@@ -57,11 +57,22 @@ const User = sequelize.define('User', {
     },
     defaultScope: {
         attributes: { exclude: ['password'] }
+    },
+    scopes: {
+        withPassword: {
+            attributes: {}
+        }
     }
 });
 
 User.prototype.checkPassword = async function(password) {
     return await bcrypt.compare(password, this.password);
+};
+
+User.prototype.toJSON = function() {
+    const values = { ...this.get() };
+    delete values.password;
+    return values;
 };
 
 export default User;

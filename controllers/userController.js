@@ -1,6 +1,7 @@
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import User from '../models/User.js';
+import { Op } from 'sequelize';
 
 const signup = async (req, res) => {
     try {
@@ -37,8 +38,8 @@ const login = async (req, res) => {
     try {
         const { email, password } = req.body;
 
-        // Check if the user exists
-        const user = await User.findOne({ where: { email } });
+        // Use a scope that includes password for authentication
+        const user = await User.scope('withPassword').findOne({ where: { email } });
         if (!user) {
             return res.status(400).send({ error: 'Invalid email or password' });
         }
@@ -52,22 +53,56 @@ const login = async (req, res) => {
         // Generate a JWT token using user id
         const token = jwt.sign({ userId: user.id }, process.env.JWT_SECRET, { expiresIn: '1h' });
 
-        res.status(200).send({ user, token });
+        // Convert to plain object and remove password
+        const userWithoutPassword = user.toJSON();
+
+        res.status(200).send({ user: userWithoutPassword, token });
     } catch (error) {
         res.status(400).send({ error: error.message });
     }
 };
 
-// Get all users
+// Get all users with optional stats
 export const getAllUsers = async (req, res, next) => {
     try {
         console.log('Getting all users...');
+        const { includeStats } = req.query;
+        
         const users = await User.findAll();
         console.log(`Found ${users.length} users`);
-        return res.status(200).json(users);
+        
+        // If includeStats is true, include user statistics
+        let response = users;
+        
+        if (includeStats === 'true') {
+            // Get user statistics
+            const totalUsers = await User.count();
+            const totalStaff = await User.count({
+                where: {
+                    role: {
+                        [Op.in]: ['admin', 'organizer']
+                    }
+                }
+            });
+            const totalRegularUsers = await User.count({
+                where: {
+                    role: 'user'
+                }
+            });
+            
+            response = {
+                users,
+                stats: {
+                    totalUsers,
+                    totalStaff,
+                    totalRegularUsers
+                }
+            };
+        }
+        
+        return res.status(200).json(response);
     } catch (error) {
         console.error('Error in getAllUsers:', error);
-        // Pass the error to the error handler middleware
         return next(error);
     }
 };

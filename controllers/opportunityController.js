@@ -1,28 +1,43 @@
 import Opportunity from '../models/Opportunity.js';
+import Applicant from '../models/Applicant.js';
+import { Op } from 'sequelize';
 
-// Get all opportunities with pagination
+// Get all opportunities with optional stats
 export const getAllOpportunities = async (req, res) => {
     try {
-        const { status, type, isRemote } = req.query;
-        const { limit, offset } = req.pagination;
-        const filters = {};
-
-        if (status) filters.status = status;
-        if (type) filters.type = type;
-        if (isRemote) filters.isRemote = isRemote === 'true';
-
+        const { category, status, includeStats } = req.query;
+        const { limit, offset } = req.pagination || { limit: 10, offset: 0 };
+        
+        // Build filter conditions
+        const where = {};
+        if (category) {
+            where.category = category;
+        }
+        if (status) {
+            where.status = status;
+        }
+        
+        // Get opportunities with pagination
         const { count, rows: opportunities } = await Opportunity.findAndCountAll({
-            where: filters,
+            where,
             order: [['createdAt', 'DESC']],
             limit,
-            offset
+            offset,
+            include: [
+                {
+                    model: Applicant,
+                    as: 'applicants',
+                    attributes: ['id']
+                }
+            ]
         });
-
+        
         // Calculate pagination metadata
         const totalPages = Math.ceil(count / limit);
         const currentPage = Math.floor(offset / limit) + 1;
         
-        res.status(200).json({
+        // Prepare response
+        let response = {
             opportunities,
             pagination: {
                 total: count,
@@ -31,9 +46,73 @@ export const getAllOpportunities = async (req, res) => {
                 perPage: limit,
                 hasMore: currentPage < totalPages
             }
-        });
+        };
+        
+        // Include stats if requested
+        if (includeStats === 'true') {
+            const now = new Date();
+            
+            // Get total opportunities count
+            const totalOpportunities = await Opportunity.count();
+            
+            // Get active opportunities (status = Active and deadline > now)
+            const activeOpportunities = await Opportunity.count({
+                where: {
+                    status: 'Active',
+                    deadline: {
+                        [Op.gt]: now
+                    }
+                }
+            });
+            
+            // Get opportunities by category
+            const opportunitiesByCategory = await Opportunity.findAll({
+                attributes: ['category', [sequelize.fn('COUNT', sequelize.col('id')), 'count']],
+                group: ['category']
+            });
+            
+            // Get opportunities by status
+            const opportunitiesByStatus = await Opportunity.findAll({
+                attributes: ['status', [sequelize.fn('COUNT', sequelize.col('id')), 'count']],
+                group: ['status']
+            });
+            
+            // Get opportunities with most applicants (top 5)
+            const popularOpportunities = await Opportunity.findAll({
+                attributes: [
+                    'id',
+                    'title',
+                    [sequelize.fn('COUNT', sequelize.col('applicants.id')), 'applicantCount']
+                ],
+                include: [
+                    {
+                        model: Applicant,
+                        as: 'applicants',
+                        attributes: []
+                    }
+                ],
+                group: ['Opportunity.id'],
+                order: [[sequelize.fn('COUNT', sequelize.col('applicants.id')), 'DESC']],
+                limit: 5
+            });
+            
+            // Add stats to response
+            response.stats = {
+                totalOpportunities,
+                activeOpportunities,
+                byCategory: opportunitiesByCategory,
+                byStatus: opportunitiesByStatus,
+                popularOpportunities
+            };
+        }
+        
+        res.status(200).json(response);
     } catch (error) {
-        res.status(500).json({ message: 'Error fetching opportunities', error: error.message });
+        console.error('Error fetching opportunities:', error);
+        res.status(500).json({
+            message: 'Error fetching opportunities',
+            error: error.message
+        });
     }
 };
 

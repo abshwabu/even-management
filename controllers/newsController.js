@@ -1,27 +1,32 @@
 import News from '../models/News.js';
+import { Op } from 'sequelize';
 
-// Get all news with pagination
+// Get all news with optional stats
 export const getAllNews = async (req, res) => {
     try {
-        const { status, category } = req.query;
-        const { limit, offset } = req.pagination;
-        const filters = {};
-
-        if (status) filters.status = status;
-        if (category) filters.category = category;
-
+        const { category, includeStats } = req.query;
+        const { limit, offset } = req.pagination || { limit: 10, offset: 0 };
+        
+        // Build filter conditions
+        const where = {};
+        if (category) {
+            where.category = category;
+        }
+        
+        // Get news with pagination
         const { count, rows: news } = await News.findAndCountAll({
-            where: filters,
-            order: [['publishedAt', 'DESC']],
+            where,
+            order: [['date', 'DESC']],
             limit,
             offset
         });
-
+        
         // Calculate pagination metadata
         const totalPages = Math.ceil(count / limit);
         const currentPage = Math.floor(offset / limit) + 1;
         
-        res.status(200).json({
+        // Prepare response
+        let response = {
             news,
             pagination: {
                 total: count,
@@ -30,9 +35,65 @@ export const getAllNews = async (req, res) => {
                 perPage: limit,
                 hasMore: currentPage < totalPages
             }
-        });
+        };
+        
+        // Include stats if requested
+        if (includeStats === 'true') {
+            // Get total news count
+            const totalNews = await News.count();
+            
+            // Get news by category
+            const newsByCategory = await News.findAll({
+                attributes: ['category', [sequelize.fn('COUNT', sequelize.col('id')), 'count']],
+                group: ['category']
+            });
+            
+            // Get news by month (for the last 6 months)
+            const sixMonthsAgo = new Date();
+            sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
+            
+            const newsByMonth = await News.findAll({
+                attributes: [
+                    [sequelize.fn('date_trunc', 'month', sequelize.col('date')), 'month'],
+                    [sequelize.fn('COUNT', sequelize.col('id')), 'count']
+                ],
+                where: {
+                    date: {
+                        [Op.gte]: sixMonthsAgo
+                    }
+                },
+                group: [sequelize.fn('date_trunc', 'month', sequelize.col('date'))],
+                order: [[sequelize.fn('date_trunc', 'month', sequelize.col('date')), 'ASC']]
+            });
+            
+            // Get recent news (last 7 days)
+            const lastWeek = new Date();
+            lastWeek.setDate(lastWeek.getDate() - 7);
+            
+            const recentNewsCount = await News.count({
+                where: {
+                    date: {
+                        [Op.gte]: lastWeek
+                    }
+                }
+            });
+            
+            // Add stats to response
+            response.stats = {
+                totalNews,
+                byCategory: newsByCategory,
+                byMonth: newsByMonth,
+                recentNewsCount
+            };
+        }
+        
+        res.status(200).json(response);
     } catch (error) {
-        res.status(500).json({ message: 'Error fetching news', error: error.message });
+        console.error('Error fetching news:', error);
+        res.status(500).json({
+            message: 'Error fetching news',
+            error: error.message
+        });
     }
 };
 

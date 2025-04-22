@@ -1,6 +1,7 @@
 import Applicant from '../models/Applicant.js';
 import Opportunity from '../models/Opportunity.js';
 import User from '../models/User.js';
+import { Op } from 'sequelize';
 
 // Get all applicants for an opportunity
 export const getOpportunityApplicants = async (req, res) => {
@@ -201,5 +202,109 @@ export const deleteApplication = async (req, res) => {
         res.status(200).json({ message: 'Application deleted successfully' });
     } catch (error) {
         res.status(500).json({ message: 'Error deleting application', error: error.message });
+    }
+};
+
+// Get all applicants with optional stats
+export const getAllApplicants = async (req, res) => {
+    try {
+        const { status, category, includeStats } = req.query;
+        const { limit, offset } = req.pagination || { limit: 10, offset: 0 };
+        
+        // Build filter conditions
+        const where = {};
+        if (status) {
+            where.status = status;
+        }
+        
+        // Add category filter if provided (this requires joining with Opportunity)
+        const include = [{
+            model: Opportunity,
+            as: 'opportunity',
+            attributes: ['id', 'title', 'category', 'deadline']
+        }];
+        
+        if (category) {
+            include[0].where = { category };
+        }
+        
+        // Get applicants with pagination
+        const { count, rows: applicants } = await Applicant.findAndCountAll({
+            where,
+            order: [['applicationDate', 'DESC']],
+            limit,
+            offset,
+            include
+        });
+        
+        // Calculate pagination metadata
+        const totalPages = Math.ceil(count / limit);
+        const currentPage = Math.floor(offset / limit) + 1;
+        
+        // Prepare response
+        let response = {
+            applicants,
+            pagination: {
+                total: count,
+                totalPages,
+                currentPage,
+                perPage: limit,
+                hasMore: currentPage < totalPages
+            }
+        };
+        
+        // Include stats if requested
+        if (includeStats === 'true') {
+            // Get total applicants count
+            const totalApplicants = await Applicant.count();
+            
+            // Get applicants by status
+            const applicantsByStatus = await Applicant.findAll({
+                attributes: ['status', [sequelize.fn('COUNT', sequelize.col('id')), 'count']],
+                group: ['status']
+            });
+            
+            // Get applicants by category (requires joining with Opportunity)
+            const applicantsByCategory = await Applicant.findAll({
+                attributes: [
+                    [sequelize.col('opportunity.category'), 'category'],
+                    [sequelize.fn('COUNT', sequelize.col('Applicant.id')), 'count']
+                ],
+                include: [{
+                    model: Opportunity,
+                    as: 'opportunity',
+                    attributes: []
+                }],
+                group: [sequelize.col('opportunity.category')]
+            });
+            
+            // Get recent applicants (last 7 days)
+            const lastWeek = new Date();
+            lastWeek.setDate(lastWeek.getDate() - 7);
+            
+            const recentApplicantsCount = await Applicant.count({
+                where: {
+                    applicationDate: {
+                        [Op.gte]: lastWeek
+                    }
+                }
+            });
+            
+            // Add stats to response
+            response.stats = {
+                totalApplicants,
+                byStatus: applicantsByStatus,
+                byCategory: applicantsByCategory,
+                recentApplicantsCount
+            };
+        }
+        
+        res.status(200).json(response);
+    } catch (error) {
+        console.error('Error fetching applicants:', error);
+        res.status(500).json({
+            message: 'Error fetching applicants',
+            error: error.message
+        });
     }
 }; 

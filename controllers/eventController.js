@@ -2,12 +2,15 @@ import Event from '../models/Event.js';
 import Calendar from '../models/Calendar.js';
 import Notification from '../models/Notification.js';
 import Guest from '../models/Guest.js';
+import User from '../models/User.js';
+import Registration from '../models/Registration.js';
+import { Op } from 'sequelize';
 
-// Get all events with pagination
+// Get all events with pagination and stats
 export const getAllEvents = async (req, res) => {
     try {
-        const { status, category, isActive } = req.query;
-        const { limit, offset } = req.pagination;
+        const { status, category, isActive, includeStats } = req.query;
+        const { limit, offset } = req.pagination || { limit: 10, offset: 0 };
         const filters = {};
         
         if (status) filters.status = status;
@@ -31,7 +34,65 @@ export const getAllEvents = async (req, res) => {
         const totalPages = Math.ceil(count / limit);
         const currentPage = Math.floor(offset / limit) + 1;
         
-        res.status(200).json({
+        // If includeStats is true, include event statistics
+        let stats = null;
+        if (includeStats === 'true') {
+            const now = new Date();
+            
+            // Get event statistics
+            const totalEvents = await Event.count();
+            const totalPastEvents = await Event.count({
+                where: {
+                    endDateTime: {
+                        [Op.lt]: now
+                    }
+                }
+            });
+            const totalOngoingEvents = await Event.count({
+                where: {
+                    startDateTime: {
+                        [Op.lte]: now
+                    },
+                    endDateTime: {
+                        [Op.gte]: now
+                    }
+                }
+            });
+            const totalUpcomingEvents = await Event.count({
+                where: {
+                    startDateTime: {
+                        [Op.gt]: now
+                    }
+                }
+            });
+            const inactiveEvents = await Event.count({
+                where: {
+                    isActive: false
+                }
+            });
+            
+            // Get recent actions
+            const recentActions = await Event.findAll({
+                attributes: ['id', 'title', 'updatedAt'],
+                order: [['updatedAt', 'DESC']],
+                limit: 5
+            });
+            
+            stats = {
+                totalEvents,
+                totalPastEvents,
+                totalOngoingEvents,
+                totalUpcomingEvents,
+                inactiveEvents,
+                recentActions: recentActions.map(event => ({
+                    actionType: 'update',
+                    eventTitle: event.title,
+                    dateAndTime: event.updatedAt
+                }))
+            };
+        }
+        
+        const response = {
             events,
             pagination: {
                 total: count,
@@ -40,7 +101,14 @@ export const getAllEvents = async (req, res) => {
                 perPage: limit,
                 hasMore: currentPage < totalPages
             }
-        });
+        };
+        
+        // Add stats if requested
+        if (stats) {
+            response.stats = stats;
+        }
+        
+        res.status(200).json(response);
     } catch (error) {
         console.error('Error fetching events:', error);
         res.status(500).json({

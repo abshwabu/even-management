@@ -3,16 +3,46 @@ import Event from '../models/Event.js';
 import initializePayment from '../utils/chapa.js';
 import User from '../models/User.js';
 
-// Get all registrations
+// Get all registrations with optional stats
 export const getAllRegistrations = async (req, res) => {
     try {
+        const { includeStats } = req.query;
+        
         const registrations = await Registration.findAll({
             include: [
                 { model: User, as: 'user' },
                 { model: Event, as: 'event' }
             ]
         });
-        res.status(200).json(registrations);
+        
+        // If includeStats is true, include registration statistics
+        let response = registrations;
+        
+        if (includeStats === 'true') {
+            // Get registration statistics
+            const totalRegistrations = await Registration.count();
+            const paidRegistrations = await Registration.count({
+                include: [{
+                    model: Event,
+                    as: 'event',
+                    where: {
+                        isPaid: true
+                    }
+                }]
+            });
+            const freeRegistrations = totalRegistrations - paidRegistrations;
+            
+            response = {
+                registrations,
+                stats: {
+                    totalRegistrations,
+                    paidRegistrations,
+                    freeRegistrations
+                }
+            };
+        }
+        
+        res.status(200).json(response);
     } catch (error) {
         console.error('Error getting registrations:', error);
         res.status(500).json({ error: error.message });
