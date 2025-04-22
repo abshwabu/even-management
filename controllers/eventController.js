@@ -145,14 +145,15 @@ export const createEvent = async (req, res) => {
             });
         }
         
-        const eventData = {
-            ...req.body,
+        // Remove any fields that don't exist in the model
+        const { invitedGuests, ...eventData } = req.body;
+        
+        const event = await Event.create({
+            ...eventData,
             organizerId: req.user.id,
             mainImage: mainImage,
             images: additionalImages
-        };
-        
-        const event = await Event.create(eventData);
+        });
 
         // Create calendar entry
         await Calendar.create({
@@ -190,7 +191,8 @@ export const updateEvent = async (req, res) => {
             return res.status(403).json({ message: 'Not authorized to edit this event' });
         }
 
-        const { organizerId, ...updateData } = req.body;
+        // Remove fields that don't exist in the model
+        const { organizerId, invitedGuests, ...updateData } = req.body;
         
         // Process main image if uploaded
         if (req.files && req.files.mainImage) {

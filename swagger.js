@@ -19,8 +19,8 @@ const options = {
     },
     servers: [
       {
-        url: 'https://event-management-zk4x.onrender.com',  // No trailing slash
-        description: 'Production server',
+        url: process.env.API_URL || 'https://event-management-zk4x.onrender.com',
+        description: process.env.API_URL ? 'Development server' : 'Production server',
       },
     ],
     components: {

@@ -17,10 +17,6 @@ const Guest = sequelize.define('Guest', {
         type: DataTypes.STRING,
         allowNull: true,
     },
-    membership: {
-        type: DataTypes.STRING,
-        allowNull: true,
-    },
     image: {
         type: DataTypes.STRING,
         allowNull: true,

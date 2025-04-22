@@ -102,7 +102,9 @@ export const updateGuest = async (req, res) => {
             return res.status(403).json({ message: 'Not authorized to update this guest' });
         }
         
-        const updateData = { ...req.body };
+        // Filter out any fields that don't exist in the model
+        const { membership, ...updateData } = req.body;
+        
         if (req.file) {
             updateData.image = `/uploads/guests/${req.file.filename}`;
         }
