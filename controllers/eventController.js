@@ -167,15 +167,22 @@ export const getEventById = async (req, res) => {
 // Create event
 export const createEvent = async (req, res) => {
     try {
-        // Process uploaded files
-        const mainImage = req.files.mainImage ? `/uploads/events/${req.files.mainImage[0].filename}` : null;
+        // Check if req.files exists before trying to access it
+        let mainImage = null;
+        let additionalImages = [];
         
-        // Process additional images if any
-        const additionalImages = [];
-        if (req.files.images) {
-            req.files.images.forEach(file => {
-                additionalImages.push(`/uploads/events/${file.filename}`);
-            });
+        if (req.files) {
+            // Process main image if it exists
+            if (req.files.mainImage && req.files.mainImage.length > 0) {
+                mainImage = `/uploads/events/${req.files.mainImage[0].filename}`;
+            }
+            
+            // Process additional images if any
+            if (req.files.images) {
+                additionalImages = req.files.images.map(file => 
+                    `/uploads/events/${file.filename}`
+                );
+            }
         }
         
         // Remove any fields that don't exist in the model
@@ -208,6 +215,7 @@ export const createEvent = async (req, res) => {
 
         res.status(201).json(event);
     } catch (error) {
+        console.error('Error creating event:', error);
         res.status(400).json({ message: 'Error creating event', error: error.message });
     }
 };
