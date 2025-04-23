@@ -5,6 +5,8 @@ import Guest from '../models/Guest.js';
 import User from '../models/User.js';
 import Registration from '../models/Registration.js';
 import { Op } from 'sequelize';
+import sequelize from '../config/database.js';
+import { QueryTypes } from 'sequelize';
 
 // Get all events with pagination and stats
 export const getAllEvents = async (req, res) => {
@@ -221,18 +223,53 @@ export const updateEvent = async (req, res) => {
 // Delete event
 export const deleteEvent = async (req, res) => {
     try {
-        const event = await Event.findByPk(req.params.id);
-        if (!event) {
-            return res.status(404).json({ message: 'Event not found' });
-        }
+        // Start a transaction to ensure all operations succeed or fail together
+        const transaction = await sequelize.transaction();
 
-        if (event.organizerId !== req.user.id && req.user.role !== 'admin') {
-            return res.status(403).json({ message: 'Not authorized to delete this event' });
-        }
+        try {
+            const event = await Event.findByPk(req.params.id);
+            if (!event) {
+                await transaction.rollback();
+                return res.status(404).json({ message: 'Event not found' });
+            }
 
-        await event.destroy();
-        res.json({ message: 'Event deleted successfully' });
+            if (event.organizerId !== req.user.id && req.user.role !== 'admin') {
+                await transaction.rollback();
+                return res.status(403).json({ message: 'Not authorized to delete this event' });
+            }
+
+            // First, delete related calendar entries
+            await Calendar.destroy({
+                where: { eventId: req.params.id },
+                transaction
+            });
+
+            // Then, delete related guests
+            await Guest.destroy({
+                where: { eventId: req.params.id },
+                transaction
+            });
+
+            // Then, delete related registrations
+            await Registration.destroy({
+                where: { eventId: req.params.id },
+                transaction
+            });
+
+            // Finally, delete the event
+            await event.destroy({ transaction });
+
+            // Commit the transaction
+            await transaction.commit();
+            
+            res.json({ message: 'Event deleted successfully' });
+        } catch (error) {
+            // Rollback the transaction if any operation fails
+            await transaction.rollback();
+            throw error;
+        }
     } catch (error) {
+        console.error('Error deleting event:', error);
         res.status(500).json({ message: 'Error deleting event', error: error.message });
     }
 }; 
