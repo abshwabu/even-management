@@ -172,7 +172,6 @@ app.use((err, req, res, next) => {
 
 // Add this after your routes but before app.listen
 app.use((err, req, res, next) => {
-  // Log the full error
   console.error('Server Error:', err);
   
   // Send a detailed response in development, simpler in production
@@ -190,6 +189,12 @@ app.use((err, req, res, next) => {
 // Make sure all routes that don't exist return 404
 app.use((req, res) => {
   res.status(404).json({ error: 'Route not found' });
+});
+
+// Add this at the top of your server.js file
+process.on('unhandledRejection', (reason, promise) => {
+  console.error('Unhandled Rejection at:', promise, 'reason:', reason);
+  // Application specific logging, throwing an error, or other logic here
 });
 
 // Start the server
