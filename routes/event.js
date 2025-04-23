@@ -59,6 +59,12 @@ const router = express.Router();
  *                   format: binary
  *               location:
  *                 type: string
+ *               city:
+ *                 type: string
+ *                 description: City where the event takes place
+ *               place:
+ *                 type: string
+ *                 description: Specific venue or place for the event
  *               capacity:
  *                 type: integer
  *               isPaid:
@@ -203,6 +209,12 @@ router.get('/:id', getEventById);
  *                   format: binary
  *               location:
  *                 type: string
+ *               city:
+ *                 type: string
+ *                 description: City where the event takes place
+ *               place:
+ *                 type: string
+ *                 description: Specific venue or place for the event
  *               capacity:
  *                 type: integer
  *               category:

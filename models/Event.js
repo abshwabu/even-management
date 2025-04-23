@@ -35,6 +35,14 @@ const Event = sequelize.define('Event', {
             }
         }
     },
+    city: {
+        type: DataTypes.STRING,
+        allowNull: true,
+    },
+    place: {
+        type: DataTypes.STRING,
+        allowNull: true,
+    },
     organizerId: {
         type: DataTypes.INTEGER,
         allowNull: false,
