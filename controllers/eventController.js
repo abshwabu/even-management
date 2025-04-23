@@ -19,6 +19,37 @@ export const getAllEvents = async (req, res) => {
         if (category) filters.category = category;
         if (isActive !== undefined) filters.isActive = isActive === 'true';
         
+        // Check if city and place columns exist
+        let cityExists = true;
+        let placeExists = true;
+        
+        try {
+            await sequelize.query(
+                "SELECT city FROM \"Events\" LIMIT 0",
+                { type: QueryTypes.SELECT }
+            );
+        } catch (error) {
+            if (error.message.includes('column "city" does not exist')) {
+                cityExists = false;
+                console.log('City column does not exist, adding it...');
+                await sequelize.query("ALTER TABLE \"Events\" ADD COLUMN IF NOT EXISTS city VARCHAR(255)");
+            }
+        }
+        
+        try {
+            await sequelize.query(
+                "SELECT place FROM \"Events\" LIMIT 0",
+                { type: QueryTypes.SELECT }
+            );
+        } catch (error) {
+            if (error.message.includes('column "place" does not exist')) {
+                placeExists = false;
+                console.log('Place column does not exist, adding it...');
+                await sequelize.query("ALTER TABLE \"Events\" ADD COLUMN IF NOT EXISTS place VARCHAR(255)");
+            }
+        }
+        
+        // Now proceed with the query
         const { count, rows: events } = await Event.findAndCountAll({
             where: filters,
             order: [['startDateTime', 'ASC']],
