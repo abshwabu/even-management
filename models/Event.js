@@ -33,6 +33,63 @@ const Event = sequelize.define('Event', {
                 lat: null,
                 lng: null
             }
+        },
+        get() {
+            // Ensure location is returned as a proper JSON object
+            const rawValue = this.getDataValue('location');
+            if (rawValue) {
+                // If it's a string, parse it
+                if (typeof rawValue === 'string') {
+                    try {
+                        return JSON.parse(rawValue);
+                    } catch (e) {
+                        console.error('Error parsing location JSON:', e);
+                        return {
+                            city: '',
+                            place: '',
+                            position: { lat: null, lng: null }
+                        };
+                    }
+                }
+                // If it's already an object, return it
+                return rawValue;
+            }
+            // Return default if null
+            return {
+                city: '',
+                place: '',
+                position: { lat: null, lng: null }
+            };
+        },
+        set(value) {
+            // Ensure location is stored as a JSON string
+            if (value) {
+                if (typeof value === 'string') {
+                    try {
+                        // If it's a valid JSON string, store it
+                        JSON.parse(value);
+                        this.setDataValue('location', value);
+                    } catch (e) {
+                        // If it's not valid JSON, store default
+                        console.error('Invalid JSON string for location:', e);
+                        this.setDataValue('location', JSON.stringify({
+                            city: '',
+                            place: '',
+                            position: { lat: null, lng: null }
+                        }));
+                    }
+                } else {
+                    // If it's an object, stringify it
+                    this.setDataValue('location', JSON.stringify(value));
+                }
+            } else {
+                // If null or undefined, set default
+                this.setDataValue('location', JSON.stringify({
+                    city: '',
+                    place: '',
+                    position: { lat: null, lng: null }
+                }));
+            }
         }
     },
     city: {
@@ -59,6 +116,40 @@ const Event = sequelize.define('Event', {
         type: DataTypes.JSON, // Store array of image paths
         allowNull: true,
         defaultValue: [],
+        get() {
+            // Ensure images is returned as an array
+            const rawValue = this.getDataValue('images');
+            if (rawValue) {
+                if (typeof rawValue === 'string') {
+                    try {
+                        return JSON.parse(rawValue);
+                    } catch (e) {
+                        console.error('Error parsing images JSON:', e);
+                        return [];
+                    }
+                }
+                return rawValue;
+            }
+            return [];
+        },
+        set(value) {
+            // Ensure images is stored as a JSON string
+            if (value) {
+                if (typeof value === 'string') {
+                    try {
+                        JSON.parse(value);
+                        this.setDataValue('images', value);
+                    } catch (e) {
+                        console.error('Invalid JSON string for images:', e);
+                        this.setDataValue('images', '[]');
+                    }
+                } else {
+                    this.setDataValue('images', JSON.stringify(value));
+                }
+            } else {
+                this.setDataValue('images', '[]');
+            }
+        }
     },
     capacity: {
         type: DataTypes.INTEGER,

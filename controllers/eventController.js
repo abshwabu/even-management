@@ -185,11 +185,34 @@ export const createEvent = async (req, res) => {
             }
         }
         
+        // Process location data
+        let locationData = req.body.location;
+        if (locationData && typeof locationData === 'string') {
+            try {
+                locationData = JSON.parse(locationData);
+            } catch (e) {
+                console.error('Error parsing location JSON:', e);
+                locationData = {
+                    city: req.body.city || '',
+                    place: req.body.place || '',
+                    position: { lat: null, lng: null }
+                };
+            }
+        } else if (!locationData) {
+            // Create location object from city and place if provided
+            locationData = {
+                city: req.body.city || '',
+                place: req.body.place || '',
+                position: { lat: null, lng: null }
+            };
+        }
+        
         // Remove any fields that don't exist in the model
         const { invitedGuests, ...eventData } = req.body;
         
         const event = await Event.create({
             ...eventData,
+            location: locationData,
             organizerId: req.user.id,
             mainImage: mainImage,
             images: additionalImages
@@ -234,6 +257,33 @@ export const updateEvent = async (req, res) => {
 
         // Remove fields that don't exist in the model
         const { organizerId, invitedGuests, ...updateData } = req.body;
+        
+        // Process location data
+        if (updateData.location) {
+            if (typeof updateData.location === 'string') {
+                try {
+                    updateData.location = JSON.parse(updateData.location);
+                } catch (e) {
+                    console.error('Error parsing location JSON:', e);
+                    updateData.location = {
+                        city: updateData.city || event.location.city || '',
+                        place: updateData.place || event.location.place || '',
+                        position: event.location.position || { lat: null, lng: null }
+                    };
+                }
+            }
+        } else if (updateData.city || updateData.place) {
+            // Update location from city and place if provided
+            const currentLocation = typeof event.location === 'string' 
+                ? JSON.parse(event.location) 
+                : event.location || { city: '', place: '', position: { lat: null, lng: null } };
+                
+            updateData.location = {
+                city: updateData.city || currentLocation.city || '',
+                place: updateData.place || currentLocation.place || '',
+                position: currentLocation.position || { lat: null, lng: null }
+            };
+        }
         
         // Process main image if uploaded
         if (req.files && req.files.mainImage) {
