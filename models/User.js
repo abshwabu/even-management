@@ -10,7 +10,7 @@ const User = sequelize.define('User', {
     },
     name: {
         type: DataTypes.STRING,
-        allowNull: false,
+        allowNull: false
     },
     email: {
         type: DataTypes.STRING,
@@ -22,10 +22,11 @@ const User = sequelize.define('User', {
     },
     password: {
         type: DataTypes.STRING,
-        allowNull: false,
+        allowNull: false
     },
     phone: {
         type: DataTypes.STRING,
+        allowNull: true
     },
     role: {
         type: DataTypes.ENUM('admin', 'user', 'organizer'),
@@ -33,7 +34,7 @@ const User = sequelize.define('User', {
     },
     isRestricted: {
         type: DataTypes.BOOLEAN,
-        defaultValue: false,
+        defaultValue: false
     },
     createdAt: {
         type: DataTypes.DATE,
@@ -43,25 +44,27 @@ const User = sequelize.define('User', {
 }, {
     updatedAt: false, // disable updatedAt if not required
     tableName: 'Users',
-    hooks: {
-        beforeCreate: async (user) => {
-            if (user.password) {
-                user.password = await bcrypt.hash(user.password, 10);
-            }
-        },
-        beforeUpdate: async (user) => {
-            if (user.changed('password')) {
-                user.password = await bcrypt.hash(user.password, 10);
-            }
-        }
-    },
+    timestamps: true,
     defaultScope: {
         attributes: { exclude: ['password'] }
     },
     scopes: {
         withPassword: {
-            attributes: {}
+            attributes: {} // Include all attributes (including password)
         }
+    }
+});
+
+// Hash password before saving
+User.beforeCreate(async (user) => {
+    if (user.password) {
+        user.password = await bcrypt.hash(user.password, 10);
+    }
+});
+
+User.beforeUpdate(async (user) => {
+    if (user.changed('password')) {
+        user.password = await bcrypt.hash(user.password, 10);
     }
 });
 
@@ -76,3 +79,4 @@ User.prototype.toJSON = function() {
 };
 
 export default User;
+

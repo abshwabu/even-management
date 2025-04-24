@@ -37,27 +37,49 @@ const signup = async (req, res) => {
 const login = async (req, res) => {
     try {
         const { email, password } = req.body;
-
-        // Use a scope that includes password for authentication
+        
+        console.log(`Login attempt for: ${email}`);
+        
+        // Use scope('withPassword') to include the password field
         const user = await User.scope('withPassword').findOne({ where: { email } });
+        
         if (!user) {
+            console.log(`User not found: ${email}`);
             return res.status(400).send({ error: 'Invalid email or password' });
         }
-
+        
+        console.log(`User found: ${user.email}, Role: ${user.role}`);
+        console.log(`Password exists: ${!!user.password}`);
+        
         // Check if the password is correct
         const isMatch = await bcrypt.compare(password, user.password);
+        
         if (!isMatch) {
+            console.log(`Password mismatch for: ${email}`);
             return res.status(400).send({ error: 'Invalid email or password' });
         }
-
-        // Generate a JWT token using user id
-        const token = jwt.sign({ userId: user.id }, process.env.JWT_SECRET, { expiresIn: '1h' });
-
+        
+        console.log(`Password verified for: ${email}`);
+        
+        // Generate a JWT token with user ID and role
+        const token = jwt.sign(
+            { 
+                userId: user.id,
+                role: user.role 
+            }, 
+            process.env.JWT_SECRET, 
+            { expiresIn: '24h' }
+        );
+        
         // Convert to plain object and remove password
         const userWithoutPassword = user.toJSON();
-
+        delete userWithoutPassword.password;
+        
+        console.log(`Login successful for: ${email}`);
+        
         res.status(200).send({ user: userWithoutPassword, token });
     } catch (error) {
+        console.error('Login error:', error);
         res.status(400).send({ error: error.message });
     }
 };
