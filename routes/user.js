@@ -1,7 +1,8 @@
 import express from 'express';
 import { signup, login } from '../controllers/userController.js';
 import User from '../models/User.js';
-
+import {auth, restrictTo} from '../middleware/auth.js';
+import bcrypt from 'bcryptjs';
 const router = express.Router();
 
 /**
@@ -278,6 +279,74 @@ router.delete('/:id', async (req, res) => {
 
 router.get('/test', (req, res) => {
   res.status(200).json({ message: 'User routes are working' });
+});
+
+/**
+ * @swagger
+ * /api/users/create-test-user:
+ *   post:
+ *     summary: Create a test user
+ *     tags: [Users]
+ *     responses:
+ *       200:
+ *         description: Test user created successfully
+ *       500:
+ *         description: Server error
+ */
+router.post('/create-test-user', async (req, res) => {
+    try {
+        const testEmail = 'test@example.com';
+        const testPassword = 'password123';
+        
+        // Hash the password
+        const hashedPassword = await bcrypt.hash(testPassword, 10);
+        console.log('Generated hash:', hashedPassword);
+        
+        // Check if user exists
+        const existingUser = await User.unscoped().findOne({ where: { email: testEmail } });
+        
+        if (existingUser) {
+            // Update user
+            await existingUser.update({ password: hashedPassword });
+            console.log('Updated test user password');
+            
+            // Verify the password was saved correctly
+            const updatedUser = await User.unscoped().findOne({ where: { email: testEmail } });
+            console.log('Password field exists after update:', !!updatedUser.password);
+            console.log('Stored hash:', updatedUser.password);
+            
+            // Test password comparison
+            const isMatch = await bcrypt.compare(testPassword, updatedUser.password);
+            console.log('Password comparison test:', isMatch);
+        } else {
+            // Create new user
+            const newUser = await User.create({
+                name: 'Test User',
+                email: testEmail,
+                password: hashedPassword,
+                role: 'admin'
+            });
+            console.log('Created test user');
+            
+            // Verify the password was saved correctly
+            const createdUser = await User.unscoped().findOne({ where: { email: testEmail } });
+            console.log('Password field exists after create:', !!createdUser.password);
+            console.log('Stored hash:', createdUser.password);
+            
+            // Test password comparison
+            const isMatch = await bcrypt.compare(testPassword, createdUser.password);
+            console.log('Password comparison test:', isMatch);
+        }
+        
+        res.status(200).send({
+            message: 'Test user ready',
+            email: testEmail,
+            password: testPassword
+        });
+    } catch (error) {
+        console.error('Error creating test user:', error);
+        res.status(500).send({ error: error.message });
+    }
 });
 
 export default router;

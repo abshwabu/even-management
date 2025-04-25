@@ -197,6 +197,13 @@ process.on('unhandledRejection', (reason, promise) => {
   // Application specific logging, throwing an error, or other logic here
 });
 
+// Add this near the top of your server.js file to check if JWT_SECRET is set
+if (!process.env.JWT_SECRET) {
+    console.error('JWT_SECRET environment variable is not set!');
+    process.env.JWT_SECRET = 'fallback-secret-for-development-only';
+    console.warn('Using fallback secret for development. DO NOT USE IN PRODUCTION!');
+}
+
 // Start the server
 app.listen(port, '0.0.0.0', () => {
     console.log(`Server is running on port ${port}`);

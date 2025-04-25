@@ -2,8 +2,10 @@ import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import User from '../models/User.js';
 import { Op } from 'sequelize';
+import sequelize from '../config/database.js';
 
-const signup = async (req, res) => {
+// Signup user
+export const signup = async (req, res) => {
     try {
         const { name, email, password, phone, role } = req.body;
 
@@ -13,14 +15,11 @@ const signup = async (req, res) => {
             return res.status(400).send({ error: 'User already exists' });
         }
 
-        // Hash the password
-        const hashedPassword = await bcrypt.hash(password, 10);
-
-        // Create a new user using Sequelize's create method
+        // Create a new user; the beforeCreate hook will hash `password`
         const user = await User.create({
             name,
             email,
-            password: hashedPassword,
+            password,
             phone,
             role,
         });
@@ -34,24 +33,38 @@ const signup = async (req, res) => {
     }
 };
 
-const login = async (req, res) => {
+// Login user - Fixed version
+export const login = async (req, res) => {
     try {
         const { email, password } = req.body;
         
         console.log(`Login attempt for: ${email}`);
         
-        // Use scope('withPassword') to include the password field
-        const user = await User.scope('withPassword').findOne({ where: { email } });
+        // Use raw SQL to get user with password
+        const users = await sequelize.query(
+            'SELECT * FROM "Users" WHERE email = :email',
+            {
+                replacements: { email },
+                type: sequelize.QueryTypes.SELECT
+            }
+        );
         
-        if (!user) {
+        if (!users || users.length === 0) {
             console.log(`User not found: ${email}`);
             return res.status(400).send({ error: 'Invalid email or password' });
         }
         
+        const user = users[0];
         console.log(`User found: ${user.email}, Role: ${user.role}`);
-        console.log(`Password exists: ${!!user.password}`);
+        console.log(`Password field exists: ${!!user.password}`);
         
-        // Check if the password is correct
+        // Check if password field exists
+        if (!user.password) {
+            console.error('Password field is missing from user record');
+            return res.status(500).send({ error: 'Authentication error' });
+        }
+        
+        // Normal login flow
         const isMatch = await bcrypt.compare(password, user.password);
         
         if (!isMatch) {
@@ -63,24 +76,20 @@ const login = async (req, res) => {
         
         // Generate a JWT token with user ID and role
         const token = jwt.sign(
-            { 
-                userId: user.id,
-                role: user.role 
-            }, 
-            process.env.JWT_SECRET, 
+            { userId: user.id, role: user.role },
+            process.env.JWT_SECRET || 'fallback-secret-key',
             { expiresIn: '24h' }
         );
         
-        // Convert to plain object and remove password
-        const userWithoutPassword = user.toJSON();
-        delete userWithoutPassword.password;
+        // Remove password from response
+        delete user.password;
         
         console.log(`Login successful for: ${email}`);
         
-        res.status(200).send({ user: userWithoutPassword, token });
+        res.status(200).send({ user, token });
     } catch (error) {
         console.error('Login error:', error);
-        res.status(400).send({ error: error.message });
+        res.status(500).send({ error: 'Server error during login' });
     }
 };
 
@@ -129,4 +138,32 @@ export const getAllUsers = async (req, res, next) => {
     }
 };
 
-export { signup, login };
+// Create test user (development only)
+export const createTestUser = async (req, res) => {
+    // Only allow in development environment
+    if (process.env.NODE_ENV === 'production') {
+        return res.status(403).send({ error: 'Not available in production' });
+    }
+    
+    try {
+        const testEmail = 'test@example.com';
+        const testPassword = 'password123';
+        
+        // Let the hook hash the plain-text password exactly once
+        const user = await User.create({
+            name: 'Test User',
+            email: testEmail,
+            password: testPassword,
+            phone: '1234567890',
+            role: 'user'
+        });
+        
+        res.status(200).send({
+            message: 'Test user ready',
+            credentials: { email: testEmail, password: testPassword }
+        });
+    } catch (error) {
+        console.error('Error creating test user:', error);
+        res.status(400).send({ error: error.message });
+    }
+};
