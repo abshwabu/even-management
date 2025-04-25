@@ -167,44 +167,35 @@ export const getEventById = async (req, res) => {
 // Create event
 export const createEvent = async (req, res) => {
     try {
-        // 1) Build location object from either:
-        //    a) a JSON-string or object in req.body.location, or
-        //    b) separate lat & lng fields
-        let location;
-        if (req.body.location) {
-            location = typeof req.body.location === 'string'
-                ? JSON.parse(req.body.location)
-                : req.body.location;
-        } else {
-            const lat = parseFloat(req.body.lat);
-            const lng = parseFloat(req.body.lng);
-            location = {
-                city:  req.body.city  || '',
-                place: req.body.place || '',
-                position: {
-                    lat: isNaN(lat) ? null : lat,
-                    lng: isNaN(lng) ? null : lng
-                }
-            };
-        }
+        // 1) Build a JS‐object for location by splitting on comma:
+        //      "10,9" ⇒ { position: { lat: 10, lng: 9 }, city, place }
+        const [latRaw = '', lngRaw = ''] = (req.body.location || '').split(',');
+        const lat = parseFloat(latRaw.trim());
+        const lng = parseFloat(lngRaw.trim());
+        const location = {
+          city:  req.body.city  || '',
+          place: req.body.place || '',
+          position: {
+            lat: isNaN(lat) ? null : lat,
+            lng: isNaN(lng) ? null : lng
+          }
+        };
 
         const payload = {
-            title:         req.body.title,
-            description:   req.body.description,
-            startDateTime: req.body.startDateTime,
-            endDateTime:   req.body.endDateTime,
-            location,
-            city:          req.body.city,
-            place:         req.body.place,
-            capacity:      req.body.capacity  || null,
-            isPaid:        req.body.isPaid     === 'true' || false,
-            price:         req.body.price      || null,
-            isRecurring:   req.body.isRecurring === 'true'  || false,
-            recurrencePattern: req.body.recurrencePattern || 'none',
-            category:      req.body.category   || null,
-            status:        req.body.status     || 'upcoming',
-            isActive:      req.body.isActive   !== 'false',
-            organizerId:   req.user.id
+          title:             req.body.title,
+          description:       req.body.description,
+          startDateTime:     req.body.startDateTime,
+          endDateTime:       req.body.endDateTime,
+          location,              // pass JS object directly
+          capacity:          req.body.capacity   || null,
+          isPaid:            req.body.isPaid      || false,
+          price:             req.body.price       || null,
+          isRecurring:       req.body.isRecurring || false,
+          recurrencePattern: req.body.recurrencePattern || 'none',
+          category:          req.body.category    || null,
+          status:            req.body.status      || 'upcoming',
+          isActive:          req.body.isActive    !== 'false',
+          organizerId:       req.user.id
         };
 
         // 2) Handle your multer uploads
@@ -376,10 +367,14 @@ function formatEvent(event) {
   const pos = obj.location?.position;
   // Remove nested location
   delete obj.location;
-  // Return with top‐level lat/lng
+  // Build a comma-separated string (or empty if missing)
+  const locString =
+    pos?.lat != null && pos?.lng != null
+      ? `${pos.lat},${pos.lng}`
+      : '';
+
   return {
     ...obj,
-    lat: pos?.lat ?? null,
-    lng: pos?.lng ?? null,
+    location: locString
   };
 } 
