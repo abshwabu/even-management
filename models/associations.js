@@ -47,6 +47,10 @@ Applicant.belongsTo(Opportunity, {
     as: 'opportunity'
 });
 
+// An Event belongsTo its organizer
+Event.belongsTo(User,    { foreignKey: 'organizerId', as: 'organizer' });
+User.hasMany(Event,      { foreignKey: 'organizerId', as: 'events' });
+
 // Add other associations as needed
 
 export default {

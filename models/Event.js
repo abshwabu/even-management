@@ -35,61 +35,29 @@ const Event = sequelize.define('Event', {
             }
         },
         get() {
-            // Ensure location is returned as a proper JSON object
-            const rawValue = this.getDataValue('location');
-            if (rawValue) {
-                // If it's a string, parse it
-                if (typeof rawValue === 'string') {
-                    try {
-                        return JSON.parse(rawValue);
-                    } catch (e) {
-                        console.error('Error parsing location JSON:', e);
-                        return {
-                            city: '',
-                            place: '',
-                            position: { lat: null, lng: null }
-                        };
-                    }
+            const raw = this.getDataValue('location');
+            if (raw) {
+                if (typeof raw === 'string') {
+                    try { return JSON.parse(raw); }
+                    catch { /* fall through */ }
                 }
-                // If it's already an object, return it
-                return rawValue;
+                return raw;
             }
-            // Return default if null
-            return {
-                city: '',
-                place: '',
-                position: { lat: null, lng: null }
-            };
-        },
-        set(value) {
-            // Ensure location is stored as a JSON string
-            if (value) {
-                if (typeof value === 'string') {
-                    try {
-                        // If it's a valid JSON string, store it
-                        JSON.parse(value);
-                        this.setDataValue('location', value);
-                    } catch (e) {
-                        // If it's not valid JSON, store default
-                        console.error('Invalid JSON string for location:', e);
-                        this.setDataValue('location', JSON.stringify({
-                            city: '',
-                            place: '',
-                            position: { lat: null, lng: null }
-                        }));
-                    }
-                } else {
-                    // If it's an object, stringify it
-                    this.setDataValue('location', JSON.stringify(value));
-                }
-            } else {
-                // If null or undefined, set default
-                this.setDataValue('location', JSON.stringify({
-                    city: '',
-                    place: '',
-                    position: { lat: null, lng: null }
-                }));
-            }
+            return { city:'', place:'', position:{lat:null,lng:null} };
+        }
+    },
+    lat: {
+        type: DataTypes.VIRTUAL,
+        get() {
+            const loc = this.getDataValue('location');
+            return loc?.position?.lat ?? null;
+        }
+    },
+    lng: {
+        type: DataTypes.VIRTUAL,
+        get() {
+            const loc = this.getDataValue('location');
+            return loc?.position?.lng ?? null;
         }
     },
     city: {

@@ -126,7 +126,7 @@ export const getAllEvents = async (req, res) => {
         }
         
         const response = {
-            events,
+            events: events.map(formatEvent),
             pagination: {
                 total: count,
                 totalPages,
@@ -156,67 +156,67 @@ export const getEventById = async (req, res) => {
     try {
         const event = await Event.findByPk(req.params.id);
         if (!event) {
-            return res.status(404).send({ error: 'Event not found' });
+            return res.status(404).json({ error: 'Event not found' });
         }
-        res.status(200).send(event);
+        res.status(200).json(formatEvent(event));
     } catch (error) {
-        res.status(500).send(error);
+        res.status(500).json({ error: error.message });
     }
 };
 
 // Create event
 export const createEvent = async (req, res) => {
     try {
-        // Check if req.files exists before trying to access it
-        let mainImage = null;
-        let additionalImages = [];
-        
-        if (req.files) {
-            // Process main image if it exists
-            if (req.files.mainImage && req.files.mainImage.length > 0) {
-                mainImage = `/uploads/events/${req.files.mainImage[0].filename}`;
-            }
-            
-            // Process additional images if any
-            if (req.files.images) {
-                additionalImages = req.files.images.map(file => 
-                    `/uploads/events/${file.filename}`
-                );
-            }
-        }
-        
-        // Process location data
-        let locationData = req.body.location;
-        if (locationData && typeof locationData === 'string') {
-            try {
-                locationData = JSON.parse(locationData);
-            } catch (e) {
-                console.error('Error parsing location JSON:', e);
-                locationData = {
-                    city: req.body.city || '',
-                    place: req.body.place || '',
-                    position: { lat: null, lng: null }
-                };
-            }
-        } else if (!locationData) {
-            // Create location object from city and place if provided
-            locationData = {
-                city: req.body.city || '',
+        // 1) Build location object from either:
+        //    a) a JSON-string or object in req.body.location, or
+        //    b) separate lat & lng fields
+        let location;
+        if (req.body.location) {
+            location = typeof req.body.location === 'string'
+                ? JSON.parse(req.body.location)
+                : req.body.location;
+        } else {
+            const lat = parseFloat(req.body.lat);
+            const lng = parseFloat(req.body.lng);
+            location = {
+                city:  req.body.city  || '',
                 place: req.body.place || '',
-                position: { lat: null, lng: null }
+                position: {
+                    lat: isNaN(lat) ? null : lat,
+                    lng: isNaN(lng) ? null : lng
+                }
             };
         }
-        
-        // Remove any fields that don't exist in the model
-        const { invitedGuests, ...eventData } = req.body;
-        
-        const event = await Event.create({
-            ...eventData,
-            location: locationData,
-            organizerId: req.user.id,
-            mainImage: mainImage,
-            images: additionalImages
-        });
+
+        const payload = {
+            title:         req.body.title,
+            description:   req.body.description,
+            startDateTime: req.body.startDateTime,
+            endDateTime:   req.body.endDateTime,
+            location,
+            city:          req.body.city,
+            place:         req.body.place,
+            capacity:      req.body.capacity  || null,
+            isPaid:        req.body.isPaid     === 'true' || false,
+            price:         req.body.price      || null,
+            isRecurring:   req.body.isRecurring === 'true'  || false,
+            recurrencePattern: req.body.recurrencePattern || 'none',
+            category:      req.body.category   || null,
+            status:        req.body.status     || 'upcoming',
+            isActive:      req.body.isActive   !== 'false',
+            organizerId:   req.user.id
+        };
+
+        // 2) Handle your multer uploads
+        if (req.files?.mainImage?.length) {
+            payload.mainImage = `/uploads/events/${req.files.mainImage[0].filename}`;
+        }
+        if (req.files?.images?.length) {
+            payload.images = req.files.images.map(f => `/uploads/events/${f.filename}`);
+        }
+
+        // 3) Only these fields go to .create()
+        const event = await Event.create(payload);
 
         // Create calendar entry
         await Calendar.create({
@@ -236,7 +236,8 @@ export const createEvent = async (req, res) => {
             isRead: false
         });
 
-        res.status(201).json(event);
+        // Return the new event with only lat/lng exposed
+        res.status(201).json(formatEvent(event));
     } catch (error) {
         console.error('Error creating event:', error);
         res.status(400).json({ message: 'Error creating event', error: error.message });
@@ -361,4 +362,24 @@ export const deleteEvent = async (req, res) => {
         console.error('Error deleting event:', error);
         res.status(500).json({ message: 'Error deleting event', error: error.message });
     }
-}; 
+};
+
+// ─── 1) HELPER ────────────────────────────────────────────────────────────────
+/**
+ * Convert a Sequelize event instance into JSON with
+ * top‐level `lat`/`lng` (removing the nested `location`).
+ */
+function formatEvent(event) {
+  // get raw values (bypasses any toJSON override)
+  const obj = event.get({ plain: true });
+  // Pull out lat/lng
+  const pos = obj.location?.position;
+  // Remove nested location
+  delete obj.location;
+  // Return with top‐level lat/lng
+  return {
+    ...obj,
+    lat: pos?.lat ?? null,
+    lng: pos?.lng ?? null,
+  };
+} 
