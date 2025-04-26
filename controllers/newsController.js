@@ -1,5 +1,6 @@
 import News from '../models/News.js';
 import { Op } from 'sequelize';
+import sequelize from '../config/database.js';
 
 // Get all news with optional stats
 export const getAllNews = async (req, res) => {
@@ -16,7 +17,7 @@ export const getAllNews = async (req, res) => {
         // Get news with pagination
         const { count, rows: news } = await News.findAndCountAll({
             where,
-            order: [['date', 'DESC']],
+            order: [['publishedAt', 'DESC']],
             limit,
             offset
         });
@@ -54,16 +55,16 @@ export const getAllNews = async (req, res) => {
             
             const newsByMonth = await News.findAll({
                 attributes: [
-                    [sequelize.fn('date_trunc', 'month', sequelize.col('date')), 'month'],
+                    [sequelize.fn('date_trunc', 'month', sequelize.col('publishedAt')), 'month'],
                     [sequelize.fn('COUNT', sequelize.col('id')), 'count']
                 ],
                 where: {
-                    date: {
+                    publishedAt: {
                         [Op.gte]: sixMonthsAgo
                     }
                 },
-                group: [sequelize.fn('date_trunc', 'month', sequelize.col('date'))],
-                order: [[sequelize.fn('date_trunc', 'month', sequelize.col('date')), 'ASC']]
+                group: [sequelize.fn('date_trunc', 'month', sequelize.col('publishedAt'))],
+                order: [[sequelize.fn('date_trunc', 'month', sequelize.col('publishedAt')), 'ASC']]
             });
             
             // Get recent news (last 7 days)
@@ -72,7 +73,7 @@ export const getAllNews = async (req, res) => {
             
             const recentNewsCount = await News.count({
                 where: {
-                    date: {
+                    publishedAt: {
                         [Op.gte]: lastWeek
                     }
                 }
