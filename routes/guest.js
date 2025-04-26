@@ -1,4 +1,5 @@
 import express from 'express';
+import multer from 'multer';
 import { auth, restrictTo } from '../middleware/auth.js';
 import upload from '../middleware/upload.js';
 import {
@@ -11,8 +12,16 @@ import {
 
 const router = express.Router();
 
-// Configure upload for guest images
-const guestUpload = upload.single('image');
+router.use(express.json());
+router.use(express.urlencoded({ extended: true }));
+
+function optionalMulter(req, res, next) {
+    const ct = req.headers['content-type'] || '';
+    if (ct.startsWith('multipart/form-data')) {
+        return upload.single('image')(req, res, next);
+    }
+    next();
+}
 
 /**
  * @swagger
@@ -85,7 +94,7 @@ router.get('/events/:eventId/guests', getGuestsByEventId);
  *       404:
  *         description: Event not found
  */
-router.post('/events/:eventId/guests', auth, restrictTo(['admin', 'organizer']), guestUpload, createGuest);
+router.post('/events/:eventId/guests', auth, restrictTo(['admin', 'organizer']), optionalMulter, createGuest);
 
 /**
  * @swagger
@@ -127,7 +136,7 @@ router.post('/events/:eventId/guests', auth, restrictTo(['admin', 'organizer']),
  *       404:
  *         description: Guest not found
  */
-router.put('/guests/:id', auth, restrictTo(['admin', 'organizer']), guestUpload, updateGuest);
+router.put('/guests/:id', auth, restrictTo(['admin', 'organizer']), optionalMulter, updateGuest);
 
 /**
  * @swagger

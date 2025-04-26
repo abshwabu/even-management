@@ -1,6 +1,7 @@
 import Opportunity from '../models/Opportunity.js';
 import Applicant from '../models/Applicant.js';
-import { Op } from 'sequelize';
+import { Op, ValidationError, UniqueConstraintError } from 'sequelize';
+import sequelize from '../config/database.js';
 
 // Get all opportunities with optional stats
 export const getAllOpportunities = async (req, res) => {
@@ -51,52 +52,46 @@ export const getAllOpportunities = async (req, res) => {
         // Include stats if requested
         if (includeStats === 'true') {
             const now = new Date();
-            
-            // Get total opportunities count
-            const totalOpportunities = await Opportunity.count();
-            
-            // Get active opportunities (status = Active and deadline > now)
-            const activeOpportunities = await Opportunity.count({
-                where: {
-                    status: 'Active',
-                    deadline: {
-                        [Op.gt]: now
-                    }
-                }
+
+            // fire off all 5 stats queries in parallel
+            const totalOpportunitiesP      = Opportunity.count();
+            const activeOpportunitiesP     = Opportunity.count({
+                where: { status: 'Active', deadline: { [Op.gt]: now } }
             });
-            
-            // Get opportunities by category
-            const opportunitiesByCategory = await Opportunity.findAll({
+            const byCategoryP              = Opportunity.findAll({
                 attributes: ['category', [sequelize.fn('COUNT', sequelize.col('id')), 'count']],
                 group: ['category']
             });
-            
-            // Get opportunities by status
-            const opportunitiesByStatus = await Opportunity.findAll({
+            const byStatusP                = Opportunity.findAll({
                 attributes: ['status', [sequelize.fn('COUNT', sequelize.col('id')), 'count']],
                 group: ['status']
             });
-            
-            // Get opportunities with most applicants (top 5)
-            const popularOpportunities = await Opportunity.findAll({
+            const popularOpportunitiesP    = Opportunity.findAll({
                 attributes: [
                     'id',
                     'title',
                     [sequelize.fn('COUNT', sequelize.col('applicants.id')), 'applicantCount']
                 ],
-                include: [
-                    {
-                        model: Applicant,
-                        as: 'applicants',
-                        attributes: []
-                    }
-                ],
+                include: [{ model: Applicant, as: 'applicants', attributes: [] }],
                 group: ['Opportunity.id'],
                 order: [[sequelize.fn('COUNT', sequelize.col('applicants.id')), 'DESC']],
                 limit: 5
             });
-            
-            // Add stats to response
+
+            const [
+                totalOpportunities,
+                activeOpportunities,
+                opportunitiesByCategory,
+                opportunitiesByStatus,
+                popularOpportunities
+            ] = await Promise.all([
+                totalOpportunitiesP,
+                activeOpportunitiesP,
+                byCategoryP,
+                byStatusP,
+                popularOpportunitiesP
+            ]);
+
             response.stats = {
                 totalOpportunities,
                 activeOpportunities,
@@ -132,16 +127,40 @@ export const getOpportunityById = async (req, res) => {
 // Create opportunity
 export const createOpportunity = async (req, res) => {
     try {
+        // pull out any string‐based image field
+        const { image: imageFromBody, ...restBody } = req.body;
+
+        // build payload
         const opportunityData = {
-            ...req.body,
-            authorId: req.user.id,
-            image: req.file ? `/uploads/opportunities/${req.file.filename}` : null
+            ...restBody,
+            authorId: req.user.id
         };
-        
+        // file upload wins—else fallback to string URL
+        if (req.file) {
+            opportunityData.image = `/uploads/opportunities/${req.file.filename}`;
+        } else if (typeof imageFromBody === 'string' && imageFromBody.trim()) {
+            opportunityData.image = imageFromBody.trim();
+        }
+
         const opportunity = await Opportunity.create(opportunityData);
-        res.status(201).json(opportunity);
+        return res.status(201).json(opportunity);
     } catch (error) {
-        res.status(400).json({ message: 'Error creating opportunity', error: error.message });
+        console.error('Error creating opportunity:', error);
+        if (
+            error instanceof ValidationError ||
+            error instanceof UniqueConstraintError ||
+            error.name === 'SequelizeValidationError'
+        ) {
+            const messages = (error.errors || []).map(e => e.message);
+            return res.status(400).json({
+                message: 'Validation error',
+                errors: messages.length ? messages : [error.message]
+            });
+        }
+        return res.status(400).json({
+            message: 'Error creating opportunity',
+            error: error.message
+        });
     }
 };
 
@@ -152,24 +171,38 @@ export const updateOpportunity = async (req, res) => {
         if (!opportunity) {
             return res.status(404).json({ message: 'Opportunity not found' });
         }
-
-        // Check if user is the author or has admin role
         if (opportunity.authorId !== req.user.id && req.user.role !== 'admin') {
             return res.status(403).json({ message: 'Not authorized to edit this opportunity' });
         }
 
-        // Prevent changing the author
-        const { authorId, ...updateData } = req.body;
-        
-        // Handle image update if a new file is uploaded
+        // pull out any image string, block authorId
+        const { authorId: _ignore, image: imageFromBody, ...restFields } = req.body;
+        const updateData = { ...restFields };
         if (req.file) {
             updateData.image = `/uploads/opportunities/${req.file.filename}`;
+        } else if (typeof imageFromBody === 'string' && imageFromBody.trim()) {
+            updateData.image = imageFromBody.trim();
         }
-        
+
         await opportunity.update(updateData);
-        res.json(opportunity);
+        return res.json(opportunity);
     } catch (error) {
-        res.status(400).json({ message: 'Error updating opportunity', error: error.message });
+        console.error('Error updating opportunity:', error);
+        if (
+            error instanceof ValidationError ||
+            error instanceof UniqueConstraintError ||
+            error.name === 'SequelizeValidationError'
+        ) {
+            const messages = (error.errors || []).map(e => e.message);
+            return res.status(400).json({
+                message: 'Validation error',
+                errors: messages.length ? messages : [error.message]
+            });
+        }
+        return res.status(400).json({
+            message: 'Error updating opportunity',
+            error: error.message
+        });
     }
 };
 

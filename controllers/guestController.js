@@ -1,6 +1,7 @@
 import Guest from '../models/Guest.js';
 import Event from '../models/Event.js';
 import upload from '../middleware/upload.js';
+import { ValidationError, UniqueConstraintError } from 'sequelize';
 
 // Get all guests
 export const getAllGuests = async (req, res) => {
@@ -48,34 +49,41 @@ export const getGuestsByEventId = async (req, res) => {
 export const createGuest = async (req, res) => {
     try {
         const { eventId } = req.params;
-        const { name, profession, description } = req.body;
-        
-        // Check if event exists
+        // pull out any image string
+        const { image: imageFromBody, name, profession, description } = req.body;
+
+        // Check event
         const event = await Event.findByPk(eventId);
         if (!event) {
             return res.status(404).json({ message: 'Event not found' });
         }
-        
-        // Handle file upload if there's a photo
-        let imagePath = null;
+
+        // build payload
+        const guestData = { name, profession, description, eventId };
         if (req.file) {
-            imagePath = `/uploads/guests/${req.file.filename}`;
+            guestData.image = `/uploads/guests/${req.file.filename}`;
+        } else if (typeof imageFromBody === 'string' && imageFromBody.trim()) {
+            guestData.image = imageFromBody.trim();
         }
-        
-        const guest = await Guest.create({
-            name,
-            profession,
-            description,
-            image: imagePath,
-            eventId
-        });
-        
-        res.status(201).json(guest);
+
+        const guest = await Guest.create(guestData);
+        return res.status(201).json(guest);
     } catch (error) {
         console.error('Error creating guest:', error);
-        res.status(400).json({ 
-            message: 'Error creating guest', 
-            error: error.message 
+        if (
+            error instanceof ValidationError ||
+            error instanceof UniqueConstraintError ||
+            error.name === 'SequelizeValidationError'
+        ) {
+            const messages = (error.errors || []).map(e => e.message);
+            return res.status(400).json({
+                message: 'Validation error',
+                errors: messages.length ? messages : [error.message]
+            });
+        }
+        return res.status(400).json({
+            message: 'Error creating guest',
+            error: error.message
         });
     }
 };
@@ -84,35 +92,49 @@ export const createGuest = async (req, res) => {
 export const updateGuest = async (req, res) => {
     try {
         const { id } = req.params;
-        
+        // pull out image, drop membership
+        const {
+            membership: _ignore,
+            image: imageFromBody,
+            ...restFields
+        } = req.body;
+
         const guest = await Guest.findByPk(id, {
-            include: [{
-                model: Event,
-                as: 'event',
-                attributes: ['organizerId']
-            }]
+            include: [{ model: Event, as: 'event', attributes: ['organizerId'] }]
         });
-        
         if (!guest) {
             return res.status(404).json({ message: 'Guest not found' });
         }
-        
-        // Check if user is authorized (event organizer or admin)
         if (guest.event.organizerId !== req.user.id && req.user.role !== 'admin') {
             return res.status(403).json({ message: 'Not authorized to update this guest' });
         }
-        
-        // Filter out any fields that don't exist in the model
-        const { membership, ...updateData } = req.body;
-        
+
+        const updateData = { ...restFields };
         if (req.file) {
             updateData.image = `/uploads/guests/${req.file.filename}`;
+        } else if (typeof imageFromBody === 'string' && imageFromBody.trim()) {
+            updateData.image = imageFromBody.trim();
         }
-        
+
         await guest.update(updateData);
-        res.status(200).json(guest);
+        return res.status(200).json(guest);
     } catch (error) {
-        res.status(400).json({ message: 'Error updating guest', error: error.message });
+        console.error('Error updating guest:', error);
+        if (
+            error instanceof ValidationError ||
+            error instanceof UniqueConstraintError ||
+            error.name === 'SequelizeValidationError'
+        ) {
+            const messages = (error.errors || []).map(e => e.message);
+            return res.status(400).json({
+                message: 'Validation error',
+                errors: messages.length ? messages : [error.message]
+            });
+        }
+        return res.status(400).json({
+            message: 'Error updating guest',
+            error: error.message
+        });
     }
 };
 

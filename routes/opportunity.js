@@ -1,4 +1,5 @@
 import express from 'express';
+import multer from 'multer';
 import { auth } from '../middleware/auth.js';
 import upload from '../middleware/upload.js';
 import {
@@ -166,7 +167,21 @@ router.get('/:id', getOpportunityById);
  *       201:
  *         description: Opportunity created successfully
  */
-router.post('/', auth, upload.single('image'), createOpportunity);
+
+// 1) accept JSON or URL-encoded bodies
+router.use(express.json());
+router.use(express.urlencoded({ extended: true }));
+
+// 2) only run multer on multipart/form-data
+function optionalMulter(req, res, next) {
+  const ct = req.headers['content-type'] || '';
+  if (ct.startsWith('multipart/form-data')) {
+    return upload.single('image')(req, res, next);
+  }
+  next();
+}
+
+router.post('/', auth, optionalMulter, createOpportunity);
 
 /**
  * @swagger
@@ -214,7 +229,7 @@ router.post('/', auth, upload.single('image'), createOpportunity);
  *       200:
  *         description: Opportunity updated successfully
  */
-router.put('/:id', auth, upload.single('image'), updateOpportunity);
+router.put('/:id', auth, optionalMulter, updateOpportunity);
 
 /**
  * @swagger
