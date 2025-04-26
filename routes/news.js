@@ -9,8 +9,22 @@ import {
     deleteNews
 } from '../controllers/newsController.js';
 import pagination from '../middleware/pagination.js';
+import multer from 'multer';
 
 const router = express.Router();
+
+// 1) make sure JSON bodies get parsed
+router.use(express.json());
+router.use(express.urlencoded({ extended: true }));
+
+// 2) only run multer if it's a multipart request
+function optionalMulter(req, res, next) {
+  const ct = req.headers['content-type'] || '';
+  if (ct.startsWith('multipart/form-data')) {
+    return upload.single('image')(req, res, next);
+  }
+  next();
+}
 
 /**
  * @swagger
@@ -163,7 +177,7 @@ router.use(auth);
  *       400:
  *         description: Invalid input
  */
-router.post('/', upload.single('image'), createNews);
+router.post('/', optionalMulter, createNews);
 
 /**
  * @swagger

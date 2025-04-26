@@ -1,4 +1,5 @@
 import News from '../models/News.js';
+import { ValidationError, UniqueConstraintError } from 'sequelize';
 import { Op } from 'sequelize';
 import sequelize from '../config/database.js';
 
@@ -40,50 +41,52 @@ export const getAllNews = async (req, res) => {
         
         // Include stats if requested
         if (includeStats === 'true') {
-            // Get total news count
-            const totalNews = await News.count();
-            
-            // Get news by category
-            const newsByCategory = await News.findAll({
+            // pre-calc date boundaries
+            const sixMonthsAgo = new Date();
+            sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
+
+            const lastWeek = new Date();
+            lastWeek.setDate(lastWeek.getDate() - 7);
+
+            // launch all four queries in parallel
+            const totalNewsPromise = News.count();
+
+            const newsByCategoryPromise = News.findAll({
                 attributes: ['category', [sequelize.fn('COUNT', sequelize.col('id')), 'count']],
                 group: ['category']
             });
-            
-            // Get news by month (for the last 6 months)
-            const sixMonthsAgo = new Date();
-            sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
-            
-            const newsByMonth = await News.findAll({
+
+            const newsByMonthPromise = News.findAll({
                 attributes: [
                     [sequelize.fn('date_trunc', 'month', sequelize.col('publishedAt')), 'month'],
                     [sequelize.fn('COUNT', sequelize.col('id')), 'count']
                 ],
-                where: {
-                    publishedAt: {
-                        [Op.gte]: sixMonthsAgo
-                    }
-                },
+                where: { publishedAt: { [Op.gte]: sixMonthsAgo } },
                 group: [sequelize.fn('date_trunc', 'month', sequelize.col('publishedAt'))],
                 order: [[sequelize.fn('date_trunc', 'month', sequelize.col('publishedAt')), 'ASC']]
             });
-            
-            // Get recent news (last 7 days)
-            const lastWeek = new Date();
-            lastWeek.setDate(lastWeek.getDate() - 7);
-            
-            const recentNewsCount = await News.count({
-                where: {
-                    publishedAt: {
-                        [Op.gte]: lastWeek
-                    }
-                }
+
+            const recentNewsCountPromise = News.count({
+                where: { publishedAt: { [Op.gte]: lastWeek } }
             });
-            
-            // Add stats to response
+
+            // wait for all of them
+            const [
+                totalNews,
+                byCategory,
+                byMonth,
+                recentNewsCount
+            ] = await Promise.all([
+                totalNewsPromise,
+                newsByCategoryPromise,
+                newsByMonthPromise,
+                recentNewsCountPromise
+            ]);
+
             response.stats = {
                 totalNews,
-                byCategory: newsByCategory,
-                byMonth: newsByMonth,
+                byCategory,
+                byMonth,
                 recentNewsCount
             };
         }
@@ -114,16 +117,58 @@ export const getNewsById = async (req, res) => {
 // Create news
 export const createNews = async (req, res) => {
     try {
+        // 1) pull out image & tags (form-data fields are always strings)
+        const { image: imageFromBody, tags: tagsRaw, ...restBody } = req.body;
+
+        // 2) parse tags into an array if needed
+        let tags;
+        if (tagsRaw != null) {
+            if (Array.isArray(tagsRaw)) {
+                tags = tagsRaw;
+            } else if (typeof tagsRaw === 'string' && tagsRaw.trim()) {
+                try {
+                    tags = JSON.parse(tagsRaw);
+                } catch {
+                    tags = tagsRaw.split(',').map(t => t.trim()).filter(Boolean);
+                }
+            }
+        }
+
+        // 3) build up the create payload
         const newsData = {
-            ...req.body,
+            ...restBody,
             authorId: req.user.id,
-            image: req.file ? `/uploads/news/${req.file.filename}` : null
+            ...(tags && { tags })
         };
-        
+
+        // 4) override image if a file was uploaded
+        if (req.file) {
+            newsData.image = `/uploads/news/${req.file.filename}`;
+        } else if (typeof imageFromBody === 'string' && imageFromBody.trim()) {
+            newsData.image = imageFromBody.trim();
+        }
+
         const news = await News.create(newsData);
-        res.status(201).json(news);
+        return res.status(201).json(news);
     } catch (error) {
-        res.status(400).json({ message: 'Error creating news', error: error.message });
+        console.error('Error creating news:', error);
+        // catch any Sequelize validation or unique‐constraint error
+        if (
+            error instanceof ValidationError ||
+            error instanceof UniqueConstraintError ||
+            error.name === 'SequelizeValidationError'
+        ) {
+            const messages = (error.errors || []).map(e => e.message);
+            return res.status(400).json({
+                message: 'Validation error',
+                errors: messages.length ? messages : [error.message]
+            });
+        }
+        // fallback
+        return res.status(400).json({
+            message: 'Error creating news',
+            error: error.message
+        });
     }
 };
 
@@ -134,22 +179,62 @@ export const updateNews = async (req, res) => {
         if (!news) {
             return res.status(404).json({ message: 'News not found' });
         }
-
-        // Check if user is the author or has admin role
         if (news.authorId !== req.user.id && req.user.role !== 'admin') {
             return res.status(403).json({ message: 'Not authorized to edit this news article' });
         }
 
-        // Prevent changing the author
-        const { authorId, ...updateData } = req.body;
+        // pull out image, tags, and block changing authorId
+        const {
+            authorId: _ignore,
+            image: imageFromBody,
+            tags: tagsRaw,
+            ...restFields
+        } = req.body;
+
+        // parse tags again
+        let tags;
+        if (tagsRaw != null) {
+            if (Array.isArray(tagsRaw)) {
+                tags = tagsRaw;
+            } else if (typeof tagsRaw === 'string' && tagsRaw.trim()) {
+                try {
+                    tags = JSON.parse(tagsRaw);
+                } catch {
+                    tags = tagsRaw.split(',').map(t => t.trim()).filter(Boolean);
+                }
+            }
+        }
+
+        const updateData = {
+            ...restFields,
+            ...(tags && { tags })
+        };
+
         if (req.file) {
             updateData.image = `/uploads/news/${req.file.filename}`;
+        } else if (typeof imageFromBody === 'string' && imageFromBody.trim()) {
+            updateData.image = imageFromBody.trim();
         }
-        
+
         await news.update(updateData);
-        res.json(news);
+        return res.json(news);
     } catch (error) {
-        res.status(400).json({ message: 'Error updating news', error: error.message });
+        console.error('Error updating news:', error);
+        if (
+            error instanceof ValidationError ||
+            error instanceof UniqueConstraintError ||
+            error.name === 'SequelizeValidationError'
+        ) {
+            const messages = (error.errors || []).map(e => e.message);
+            return res.status(400).json({
+                message: 'Validation error',
+                errors: messages.length ? messages : [error.message]
+            });
+        }
+        return res.status(400).json({
+            message: 'Error updating news',
+            error: error.message
+        });
     }
 };
 
