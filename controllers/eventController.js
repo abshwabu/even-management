@@ -198,13 +198,35 @@ export const createEvent = async (req, res) => {
           organizerId:       req.user.id
         };
 
-        // 2) Handle your multer uploads
+        // 2) Handle images from both body (string or JSON array) and Multer uploads
+        // 2.1) mainImage: allow a string in body, then override with upload
+        if (req.body.mainImage) {
+          // could be a URL or Base64 string
+          payload.mainImage = req.body.mainImage;
+        }
         if (req.files?.mainImage?.length) {
-            payload.mainImage = `/uploads/events/${req.files.mainImage[0].filename}`;
+          payload.mainImage = `/uploads/events/${req.files.mainImage[0].filename}`;
         }
-        if (req.files?.images?.length) {
-            payload.images = req.files.images.map(f => `/uploads/events/${f.filename}`);
+
+        // 2.2) images: allow `images` as JSON-string or array, then append uploads
+        let bodyImages = [];
+        if (req.body.images) {
+          if (typeof req.body.images === 'string') {
+            try {
+              bodyImages = JSON.parse(req.body.images);
+            } catch {
+              // not valid JSON, treat as single URL/string
+              bodyImages = [req.body.images];
+            }
+          } else if (Array.isArray(req.body.images)) {
+            bodyImages = req.body.images;
+          }
         }
+        const uploadImages = (req.files?.images || []).map(
+          f => `/uploads/events/${f.filename}`
+        );
+        // merge: body URLs first, then uploaded files
+        payload.images = [...bodyImages, ...uploadImages];
 
         // 3) Only these fields go to .create()
         const event = await Event.create(payload);
