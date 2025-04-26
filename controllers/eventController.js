@@ -167,14 +167,12 @@ export const getEventById = async (req, res) => {
 // Create event
 export const createEvent = async (req, res) => {
     try {
-        // 1) Build a JS‐object for location by splitting on comma:
-        //      "10,9" ⇒ { position: { lat: 10, lng: 9 }, city, place }
+        // 1) Build a JS‐object for location position only:
+        //      "10,9" ⇒ { position: { lat: 10, lng: 9 } }
         const [latRaw = '', lngRaw = ''] = (req.body.location || '').split(',');
         const lat = parseFloat(latRaw.trim());
         const lng = parseFloat(lngRaw.trim());
         const location = {
-          city:  req.body.city  || '',
-          place: req.body.place || '',
           position: {
             lat: isNaN(lat) ? null : lat,
             lng: isNaN(lng) ? null : lng
@@ -186,7 +184,9 @@ export const createEvent = async (req, res) => {
           description:       req.body.description,
           startDateTime:     req.body.startDateTime,
           endDateTime:       req.body.endDateTime,
-          location,              // pass JS object directly
+          location,               // now only holds `{ position }`
+          city:              req.body.city,    // ← persist these separately
+          place:             req.body.place,
           capacity:          req.body.capacity   || null,
           isPaid:            req.body.isPaid      || false,
           price:             req.body.price       || null,
@@ -357,24 +357,31 @@ export const deleteEvent = async (req, res) => {
 
 // ─── 1) HELPER ────────────────────────────────────────────────────────────────
 /**
- * Convert a Sequelize event instance into JSON with
- * top‐level `lat`/`lng` (removing the nested `location`).
+ * Convert an Event instance into JSON:
+ *  - strip out the raw JSON column
+ *  - re-inject city/place
+ *  - return `location` as "lat,lng" string
  */
 function formatEvent(event) {
-  // get raw values (bypasses any toJSON override)
+  // 1) grab raw JSON column (may be string or object)
+  let rawLoc = event.getDataValue('location');
+  if (typeof rawLoc === 'string') {
+    try { rawLoc = JSON.parse(rawLoc); }
+    catch { rawLoc = { position:{lat:null,lng:null} }; }
+  }
+
+  // 2) extract lat/lng
+  const pos = rawLoc.position || {};
+  const location = [ pos.lat ?? null, pos.lng ?? null ];
+
+  // 3) build final object
   const obj = event.get({ plain: true });
-  // Pull out lat/lng
-  const pos = obj.location?.position;
-  // Remove nested location
   delete obj.location;
-  // Build a comma-separated string (or empty if missing)
-  const locString =
-    pos?.lat != null && pos?.lng != null
-      ? `${pos.lat},${pos.lng}`
-      : '';
+  delete obj.lat;
+  delete obj.lng;
 
   return {
     ...obj,
-    location: locString
+    location
   };
 } 

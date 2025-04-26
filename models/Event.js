@@ -25,7 +25,7 @@ const Event = sequelize.define('Event', {
     },
     location: {
         type: DataTypes.JSON,
-        allowNull: true,
+        allowNull: false,
         defaultValue: {
             city: '',
             place: '',
@@ -36,14 +36,12 @@ const Event = sequelize.define('Event', {
         },
         get() {
             const raw = this.getDataValue('location');
-            if (raw) {
-                if (typeof raw === 'string') {
-                    try { return JSON.parse(raw); }
-                    catch { /* fall through */ }
-                }
-                return raw;
+            if (!raw) return { position:{ lat:null, lng:null } };
+            if (typeof raw === 'string') {
+                try { return JSON.parse(raw); }
+                catch { return { position:{ lat:null, lng:null } }; }
             }
-            return { city:'', place:'', position:{lat:null,lng:null} };
+            return raw;
         }
     },
     lat: {
