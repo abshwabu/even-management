@@ -4,68 +4,32 @@ import fs from 'fs';
 
 // Configure storage
 const storage = multer.diskStorage({
-    destination: (req, file, cb) => {
-        // Determine the upload directory based on the route
-        const isEvent = req.baseUrl.includes('events');
-        const isGuest = req.baseUrl.includes('guests');
-        const isOpportunity = req.baseUrl.includes('opportunities');
-        const isResume = req.originalUrl.includes('apply');
-        
-        let uploadDir = 'uploads/news';
-
-        if (isEvent) {
-            uploadDir = 'uploads/events';
-        } else if (isGuest) {
-            uploadDir = 'uploads/guests';
-        } else if (isOpportunity) {
-            uploadDir = 'uploads/opportunities';
-        } else if (isResume) {
-            uploadDir = 'uploads/resumes';
-        }
-
-        // Make sure the directory exists
-        if (!fs.existsSync(uploadDir)) {
-            fs.mkdirSync(uploadDir, { recursive: true });
-        }
-
-        cb(null, uploadDir);
+    destination: function (req, file, cb) {
+        cb(null, 'uploads/events/');
     },
-    filename: (req, file, cb) => {
-        let prefix = 'news';
-        if (req.baseUrl.includes('events')) prefix = 'event';
-        else if (req.baseUrl.includes('guests')) prefix = 'guest';
-        else if (req.baseUrl.includes('opportunities')) prefix = 'opportunity';
-        else if (req.originalUrl.includes('apply')) prefix = 'resume';
-        
+    filename: function (req, file, cb) {
         const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
-        cb(null, `${prefix}-${uniqueSuffix}${path.extname(file.originalname)}`);
+        cb(null, file.fieldname + '-' + uniqueSuffix + path.extname(file.originalname));
     }
 });
 
 // File filter
 const fileFilter = (req, file, cb) => {
-    if (req.originalUrl.includes('apply')) {
-        // For resumes, allow PDF, DOC, DOCX
-        const allowedTypes = ['application/pdf', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'];
-        if (allowedTypes.includes(file.mimetype)) {
-            cb(null, true);
-        } else {
-            cb(new Error('Invalid file type. Only PDF, DOC, and DOCX are allowed for resumes.'), false);
-        }
-    } else if (file.mimetype.startsWith('image/')) {
-        // For images
-        cb(null, true);
-    } else {
-        cb(new Error('Invalid file type.'), false);
+    // Accept images only
+    if (!file.originalname.match(/\.(jpg|JPG|jpeg|JPEG|png|PNG|gif|GIF)$/)) {
+        req.fileValidationError = 'Only image files are allowed!';
+        return cb(new Error('Only image files are allowed!'), false);
     }
+    cb(null, true);
 };
 
 // Configure multer
 const upload = multer({
     storage: storage,
     fileFilter: fileFilter,
-    limits: {
-        fileSize: 10 * 1024 * 1024 // 10MB limit
+    limits: { 
+        fileSize: 5 * 1024 * 1024, // 5MB limit per file
+        files: 11 // max 11 files total (1 main + 10 additional)
     }
 });
 

@@ -1,4 +1,5 @@
 import express from 'express';
+import multer from 'multer';
 import { auth, restrictTo } from '../middleware/auth.js';
 import upload from '../middleware/upload.js';
 import pagination from '../middleware/pagination.js';
@@ -86,12 +87,24 @@ const router = express.Router();
  *       400:
  *         description: Invalid input
  */
-const uploadFields = upload.fields([
-    { name: 'mainImage', maxCount: 1 },
-    { name: 'images', maxCount: 10 }
-]);
 
-router.post('/', auth, restrictTo(['admin', 'organizer']), uploadFields, createEvent);
+// 1) accept JSON or URL-encoded bodies
+router.use(express.json());
+router.use(express.urlencoded({ extended: true }));
+
+// 2) only run multer on multipart/form-data
+function optionalMulter(req, res, next) {
+    const ct = req.headers['content-type'] || '';
+    if (ct.startsWith('multipart/form-data')) {
+        return upload.fields([
+            { name: 'mainImage', maxCount: 1 },
+            { name: 'images', maxCount: 10 }
+        ])(req, res, next);
+    }
+    next();
+}
+
+router.post('/', auth, restrictTo(['admin', 'organizer']), optionalMulter, createEvent);
 
 /**
  * @swagger
@@ -229,7 +242,7 @@ router.get('/:id', getEventById);
  *       404:
  *         description: Event not found
  */
-router.put('/:id', auth, restrictTo(['admin', 'organizer']), uploadFields, updateEvent);
+router.put('/:id', auth, restrictTo(['admin', 'organizer']), optionalMulter, updateEvent);
 
 /**
  * @swagger

@@ -7,6 +7,7 @@ import Registration from '../models/Registration.js';
 import { Op } from 'sequelize';
 import sequelize from '../config/database.js';
 import { QueryTypes } from 'sequelize';
+import { ValidationError, UniqueConstraintError } from 'sequelize';
 
 // Get all events with pagination and stats
 export const getAllEvents = async (req, res) => {
@@ -167,69 +168,42 @@ export const getEventById = async (req, res) => {
 // Create event
 export const createEvent = async (req, res) => {
     try {
-        // 1) Build a JS‐object for location position only:
-        //      "10,9" ⇒ { position: { lat: 10, lng: 9 } }
-        const [latRaw = '', lngRaw = ''] = (req.body.location || '').split(',');
-        const lat = parseFloat(latRaw.trim());
-        const lng = parseFloat(lngRaw.trim());
-        const location = {
-          position: {
-            lat: isNaN(lat) ? null : lat,
-            lng: isNaN(lng) ? null : lng
-          }
+        // pull out any string-based image fields
+        const { 
+            mainImage: mainImageFromBody, 
+            images: imagesFromBody,
+            ...restBody 
+        } = req.body;
+
+        // build payload
+        const eventData = {
+            ...restBody,
+            organizerId: req.user.id
         };
 
-        const payload = {
-          title:             req.body.title,
-          description:       req.body.description,
-          startDateTime:     req.body.startDateTime,
-          endDateTime:       req.body.endDateTime,
-          location,               // now only holds `{ position }`
-          city:              req.body.city,    // ← persist these separately
-          place:             req.body.place,
-          capacity:          req.body.capacity   || null,
-          isPaid:            req.body.isPaid      || false,
-          price:             req.body.price       || null,
-          isRecurring:       req.body.isRecurring || false,
-          recurrencePattern: req.body.recurrencePattern || 'none',
-          category:          req.body.category    || null,
-          status:            req.body.status      || 'upcoming',
-          isActive:          req.body.isActive    !== 'false',
-          organizerId:       req.user.id
-        };
-
-        // 2) Handle images from both body (string or JSON array) and Multer uploads
-        // 2.1) mainImage: allow a string in body, then override with upload
-        if (req.body.mainImage) {
-          // could be a URL or Base64 string
-          payload.mainImage = req.body.mainImage;
-        }
-        if (req.files?.mainImage?.length) {
-          payload.mainImage = `/uploads/events/${req.files.mainImage[0].filename}`;
+        // handle main image
+        if (req.files?.mainImage) {
+            eventData.mainImage = `/uploads/events/${req.files.mainImage[0].filename}`;
+        } else if (typeof mainImageFromBody === 'string' && mainImageFromBody.trim()) {
+            eventData.mainImage = mainImageFromBody.trim();
         }
 
-        // 2.2) images: allow `images` as JSON-string or array, then append uploads
-        let bodyImages = [];
-        if (req.body.images) {
-          if (typeof req.body.images === 'string') {
+        // handle additional images
+        if (req.files?.images) {
+            const imagePaths = req.files.images.map(file => `/uploads/events/${file.filename}`);
+            eventData.images = imagePaths;
+        } else if (imagesFromBody) {
             try {
-              bodyImages = JSON.parse(req.body.images);
+                const parsedImages = typeof imagesFromBody === 'string' 
+                    ? JSON.parse(imagesFromBody) 
+                    : imagesFromBody;
+                eventData.images = Array.isArray(parsedImages) ? parsedImages : [];
             } catch {
-              // not valid JSON, treat as single URL/string
-              bodyImages = [req.body.images];
+                eventData.images = [];
             }
-          } else if (Array.isArray(req.body.images)) {
-            bodyImages = req.body.images;
-          }
         }
-        const uploadImages = (req.files?.images || []).map(
-          f => `/uploads/events/${f.filename}`
-        );
-        // merge: body URLs first, then uploaded files
-        payload.images = [...bodyImages, ...uploadImages];
 
-        // 3) Only these fields go to .create()
-        const event = await Event.create(payload);
+        const event = await Event.create(eventData);
 
         // Create calendar entry
         await Calendar.create({
@@ -249,11 +223,24 @@ export const createEvent = async (req, res) => {
             isRead: false
         });
 
-        // Return the new event with only lat/lng exposed
-        res.status(201).json(formatEvent(event));
+        return res.status(201).json(formatEvent(event));
     } catch (error) {
         console.error('Error creating event:', error);
-        res.status(400).json({ message: 'Error creating event', error: error.message });
+        if (
+            error instanceof ValidationError ||
+            error instanceof UniqueConstraintError ||
+            error.name === 'SequelizeValidationError'
+        ) {
+            const messages = (error.errors || []).map(e => e.message);
+            return res.status(400).json({
+                message: 'Validation error',
+                errors: messages.length ? messages : [error.message]
+            });
+        }
+        return res.status(400).json({
+            message: 'Error creating event',
+            error: error.message
+        });
     }
 };
 
@@ -264,62 +251,62 @@ export const updateEvent = async (req, res) => {
         if (!event) {
             return res.status(404).json({ message: 'Event not found' });
         }
-
         if (event.organizerId !== req.user.id && req.user.role !== 'admin') {
             return res.status(403).json({ message: 'Not authorized to edit this event' });
         }
 
-        // Remove fields that don't exist in the model
-        const { organizerId, invitedGuests, ...updateData } = req.body;
-        
-        // Process location data
-        if (updateData.location) {
-            if (typeof updateData.location === 'string') {
-                try {
-                    updateData.location = JSON.parse(updateData.location);
-                } catch (e) {
-                    console.error('Error parsing location JSON:', e);
-                    updateData.location = {
-                        city: updateData.city || event.location.city || '',
-                        place: updateData.place || event.location.place || '',
-                        position: event.location.position || { lat: null, lng: null }
-                    };
-                }
-            }
-        } else if (updateData.city || updateData.place) {
-            // Update location from city and place if provided
-            const currentLocation = typeof event.location === 'string' 
-                ? JSON.parse(event.location) 
-                : event.location || { city: '', place: '', position: { lat: null, lng: null } };
-                
-            updateData.location = {
-                city: updateData.city || currentLocation.city || '',
-                place: updateData.place || currentLocation.place || '',
-                position: currentLocation.position || { lat: null, lng: null }
-            };
-        }
-        
-        // Process main image if uploaded
-        if (req.files && req.files.mainImage) {
+        // pull out image fields and block organizerId
+        const {
+            organizerId: _ignore,
+            mainImage: mainImageFromBody,
+            images: imagesFromBody,
+            ...restFields
+        } = req.body;
+
+        const updateData = { ...restFields };
+
+        // handle main image
+        if (req.files?.mainImage) {
             updateData.mainImage = `/uploads/events/${req.files.mainImage[0].filename}`;
+        } else if (typeof mainImageFromBody === 'string' && mainImageFromBody.trim()) {
+            updateData.mainImage = mainImageFromBody.trim();
         }
-        
-        // Process additional images if uploaded
-        if (req.files && req.files.images) {
-            // If append=true in query, add to existing images
-            if (req.query.append === 'true') {
-                const newImages = req.files.images.map(file => `/uploads/events/${file.filename}`);
-                updateData.images = [...(event.images || []), ...newImages];
-            } else {
-                // Replace all images
-                updateData.images = req.files.images.map(file => `/uploads/events/${file.filename}`);
+
+        // handle additional images
+        if (req.files?.images) {
+            const imagePaths = req.files.images.map(file => `/uploads/events/${file.filename}`);
+            updateData.images = imagePaths;
+        } else if (imagesFromBody) {
+            try {
+                const parsedImages = typeof imagesFromBody === 'string' 
+                    ? JSON.parse(imagesFromBody) 
+                    : imagesFromBody;
+                updateData.images = Array.isArray(parsedImages) ? parsedImages : [];
+            } catch {
+                // keep existing images if parsing fails
+                delete updateData.images;
             }
         }
-        
+
         await event.update(updateData);
-        res.json(event);
+        return res.json(event);
     } catch (error) {
-        res.status(400).json({ message: 'Error updating event', error: error.message });
+        console.error('Error updating event:', error);
+        if (
+            error instanceof ValidationError ||
+            error instanceof UniqueConstraintError ||
+            error.name === 'SequelizeValidationError'
+        ) {
+            const messages = (error.errors || []).map(e => e.message);
+            return res.status(400).json({
+                message: 'Validation error',
+                errors: messages.length ? messages : [error.message]
+            });
+        }
+        return res.status(400).json({
+            message: 'Error updating event',
+            error: error.message
+        });
     }
 };
 
