@@ -6,7 +6,7 @@ import dotenv from 'dotenv';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import fs from 'fs';
-import { Sequelize } from 'sequelize';
+import sequelize from './config/database.js';
 import './models/associations.js';  // Import associations to ensure they're loaded
 dotenv.config();
 
@@ -22,6 +22,7 @@ import newsRoutes from './routes/news.js';
 import opportunityRoutes from './routes/opportunity.js';
 import guestRoutes from './routes/guest.js';
 import applicantRoutes from './routes/applicant.js';
+import categoriesRoutes from './routes/categories.js';
 
 const app = express();
 const port = process.env.PORT || 3000;
@@ -63,6 +64,7 @@ app.use('/api/news', newsRoutes);
 app.use('/api/opportunities', opportunityRoutes);
 app.use('/api', guestRoutes);
 app.use('/api', applicantRoutes);
+app.use('/api/categories', categoriesRoutes);
 app.use('/', swaggerRoutes); // Swagger documentation route
 
 // Serve static files from uploads directory
@@ -85,6 +87,15 @@ connectDB().catch(err => {
     console.error('Failed to connect to database:', err);
     // Continue running the server even if DB connection fails
 });
+
+// Sync database schema
+sequelize.sync({ force: true })  // This will drop and recreate all tables
+    .then(() => {
+        console.log('Database schema synchronized successfully');
+    })
+    .catch(err => {
+        console.error('Error synchronizing database schema:', err);
+    });
 
 // Add a health check endpoint
 app.get('/health', (req, res) => {

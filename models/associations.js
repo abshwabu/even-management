@@ -6,6 +6,8 @@ import Payment from './Payment.js';
 import Notification from './Notification.js';
 import Opportunity from './Opportunity.js';
 import Applicant from './Applicant.js';
+import News from './News.js';
+import Category from './Category.js';
 
 // Clear any existing associations to prevent duplicates
 // This is important when the file might be loaded multiple times
@@ -15,6 +17,8 @@ User.associations = {};
 Registration.associations = {};
 Opportunity.associations = {};
 Applicant.associations = {};
+News.associations = {};
+Category.associations = {};
 
 // Define associations
 User.hasMany(Registration, { foreignKey: 'userId' });
@@ -51,6 +55,18 @@ Applicant.belongsTo(Opportunity, {
 Event.belongsTo(User,    { foreignKey: 'organizerId', as: 'organizer' });
 User.hasMany(Event,      { foreignKey: 'organizerId', as: 'events' });
 
+// News belongs to a Category
+News.belongsTo(Category, {
+    foreignKey: 'categoryId',
+    as: 'category'
+});
+
+// Category has many News
+Category.hasMany(News, {
+    foreignKey: 'categoryId',
+    as: 'news'
+});
+
 // Add other associations as needed
 
 export default {
@@ -61,6 +77,8 @@ export default {
   Payment,
   Notification,
   Opportunity,
-  Applicant
+  Applicant,
+  News,
+  Category
   // Add other models
 }; 

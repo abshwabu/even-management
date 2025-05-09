@@ -1,4 +1,5 @@
 import News from '../models/News.js';
+import Category from '../models/Category.js';
 import { ValidationError, UniqueConstraintError } from 'sequelize';
 import { Op } from 'sequelize';
 import sequelize from '../config/database.js';
@@ -6,18 +7,23 @@ import sequelize from '../config/database.js';
 // Get all news with optional stats
 export const getAllNews = async (req, res) => {
     try {
-        const { category, includeStats } = req.query;
+        const { categoryId, includeStats } = req.query;
         const { limit, offset } = req.pagination || { limit: 10, offset: 0 };
         
         // Build filter conditions
         const where = {};
-        if (category) {
-            where.category = category;
+        if (categoryId) {
+            where.categoryId = categoryId;
         }
         
         // Get news with pagination
         const { count, rows: news } = await News.findAndCountAll({
             where,
+            include: [{
+                model: Category,
+                as: 'category',
+                attributes: ['id', 'name', 'description']
+            }],
             order: [['publishedAt', 'DESC']],
             limit,
             offset
@@ -52,8 +58,13 @@ export const getAllNews = async (req, res) => {
             const totalNewsPromise = News.count();
 
             const newsByCategoryPromise = News.findAll({
-                attributes: ['category', [sequelize.fn('COUNT', sequelize.col('id')), 'count']],
-                group: ['category']
+                attributes: ['categoryId', [sequelize.fn('COUNT', sequelize.col('id')), 'count']],
+                include: [{
+                    model: Category,
+                    as: 'category',
+                    attributes: ['name']
+                }],
+                group: ['categoryId', 'category.id', 'category.name']
             });
 
             const newsByMonthPromise = News.findAll({
@@ -104,7 +115,13 @@ export const getAllNews = async (req, res) => {
 // Get single news
 export const getNewsById = async (req, res) => {
     try {
-        const news = await News.findByPk(req.params.id);
+        const news = await News.findByPk(req.params.id, {
+            include: [{
+                model: Category,
+                as: 'category',
+                attributes: ['id', 'name', 'description']
+            }]
+        });
         if (!news) {
             return res.status(404).json({ message: 'News not found' });
         }
@@ -149,7 +166,17 @@ export const createNews = async (req, res) => {
         }
 
         const news = await News.create(newsData);
-        return res.status(201).json(news);
+        
+        // Fetch the created news with category data
+        const newsWithCategory = await News.findByPk(news.id, {
+            include: [{
+                model: Category,
+                as: 'category',
+                attributes: ['id', 'name', 'description']
+            }]
+        });
+        
+        return res.status(201).json(newsWithCategory);
     } catch (error) {
         console.error('Error creating news:', error);
         // catch any Sequelize validation or unique‐constraint error
@@ -217,7 +244,17 @@ export const updateNews = async (req, res) => {
         }
 
         await news.update(updateData);
-        return res.json(news);
+        
+        // Fetch the updated news with category data
+        const updatedNews = await News.findByPk(news.id, {
+            include: [{
+                model: Category,
+                as: 'category',
+                attributes: ['id', 'name', 'description']
+            }]
+        });
+        
+        return res.json(updatedNews);
     } catch (error) {
         console.error('Error updating news:', error);
         if (

@@ -2,6 +2,11 @@ import { DataTypes } from 'sequelize';
 import sequelize from '../config/database.js';
 
 const News = sequelize.define('News', {
+    id: {
+        type: DataTypes.INTEGER,
+        primaryKey: true,
+        autoIncrement: true
+    },
     title: {
         type: DataTypes.STRING,
         allowNull: false,
@@ -27,13 +32,19 @@ const News = sequelize.define('News', {
         allowNull: false,
         defaultValue: 'draft',
     },
-    category: {
-        type: DataTypes.STRING,
+    categoryId: {
+        type: DataTypes.INTEGER,
         allowNull: true,
+        references: {
+            model: 'Categories',
+            key: 'id'
+        },
+        onDelete: 'SET NULL'
     },
     tags: {
-        type: DataTypes.JSON,
+        type: DataTypes.JSONB,
         allowNull: true,
+        defaultValue: []
     },
     publishedAt: {
         type: DataTypes.DATE,
@@ -51,6 +62,7 @@ const News = sequelize.define('News', {
     }
 }, {
     tableName: 'News',
+    timestamps: true
 });
 
 export default News; 

@@ -24,11 +24,11 @@ const Event = sequelize.define('Event', {
         allowNull: false,
     },
     location: {
-        type: DataTypes.JSON,
+        type: DataTypes.JSONB,
         allowNull: false,
         defaultValue: {
-            city: '',
-            place: '',
+            city: "",
+            place: "",
             position: {
                 lat: null,
                 lng: null

@@ -52,8 +52,11 @@ function optionalMulter(req, res, next) {
  *           type: string
  *           enum: [draft, published, archived]
  *           default: draft
+ *         categoryId:
+ *           type: integer
+ *           description: Reference to the category
  *         category:
- *           type: string
+ *           $ref: '#/components/schemas/Category'
  *         tags:
  *           type: array
  *           items:
@@ -90,19 +93,70 @@ function optionalMulter(req, res, next) {
  *           enum: [draft, published, archived]
  *         description: Filter by status
  *       - in: query
- *         name: category
+ *         name: categoryId
  *         schema:
- *           type: string
- *         description: Filter by category
+ *           type: integer
+ *         description: Filter by category ID
+ *       - in: query
+ *         name: includeStats
+ *         schema:
+ *           type: boolean
+ *         description: Include statistics in the response
  *     responses:
  *       200:
  *         description: List of news articles
  *         content:
  *           application/json:
  *             schema:
- *               type: array
- *               items:
- *                 $ref: '#/components/schemas/News'
+ *               type: object
+ *               properties:
+ *                 news:
+ *                   type: array
+ *                   items:
+ *                     $ref: '#/components/schemas/News'
+ *                 pagination:
+ *                   type: object
+ *                   properties:
+ *                     total:
+ *                       type: integer
+ *                     totalPages:
+ *                       type: integer
+ *                     currentPage:
+ *                       type: integer
+ *                     perPage:
+ *                       type: integer
+ *                     hasMore:
+ *                       type: boolean
+ *                 stats:
+ *                   type: object
+ *                   properties:
+ *                     totalNews:
+ *                       type: integer
+ *                     byCategory:
+ *                       type: array
+ *                       items:
+ *                         type: object
+ *                         properties:
+ *                           categoryId:
+ *                             type: integer
+ *                           count:
+ *                             type: integer
+ *                           Category:
+ *                             type: object
+ *                             properties:
+ *                               name:
+ *                                 type: string
+ *                     byMonth:
+ *                       type: array
+ *                       items:
+ *                         type: object
+ *                         properties:
+ *                           month:
+ *                             type: string
+ *                           count:
+ *                             type: integer
+ *                     recentNewsCount:
+ *                       type: integer
  *       500:
  *         description: Server error
  */
@@ -112,6 +166,7 @@ router.get('/', pagination, getAllNews);
  * @swagger
  * /api/news/{id}:
  *   get:
+ *     tags: [News]
  *     summary: Get a news item by id
  *     parameters:
  *       - in: path
@@ -163,8 +218,8 @@ router.use(auth);
  *               status:
  *                 type: string
  *                 enum: [draft, published, archived]
- *               category:
- *                 type: string
+ *               categoryId:
+ *                 type: integer
  *               tags:
  *                 type: array
  *                 items:
@@ -172,6 +227,10 @@ router.use(auth);
  *     responses:
  *       201:
  *         description: News article created successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/News'
  *       401:
  *         description: Authentication required
  *       400:
@@ -210,11 +269,19 @@ router.post('/', optionalMulter, createNews);
  *               status:
  *                 type: string
  *                 enum: [draft, published, archived]
- *               category:
- *                 type: string
+ *               categoryId:
+ *                 type: integer
+ *               tags:
+ *                 type: array
+ *                 items:
+ *                   type: string
  *     responses:
  *       200:
  *         description: News article updated successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/News'
  *       401:
  *         description: Authentication required
  *       403:
