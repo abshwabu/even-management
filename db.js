@@ -10,7 +10,7 @@ const connectDB = async () => {
         // In production, you might not want to force sync tables
         // as it will delete all existing data
         if (process.env.NODE_ENV === 'development') {
-            await sequelize.sync({ alter: true });
+            await sequelize.sync({ alter: false });
             console.log('Database synchronized (tables altered)');
         } else {
             // In production, just sync without altering
