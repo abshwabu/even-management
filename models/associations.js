@@ -8,6 +8,7 @@ import Opportunity from './Opportunity.js';
 import Applicant from './Applicant.js';
 import News from './News.js';
 import Category from './Category.js';
+import OpportunityCategory from './OpportunityCategory.js';
 
 // Clear any existing associations to prevent duplicates
 // This is important when the file might be loaded multiple times
@@ -19,6 +20,7 @@ Opportunity.associations = {};
 Applicant.associations = {};
 News.associations = {};
 Category.associations = {};
+OpportunityCategory.associations = {};
 
 // Define associations
 User.hasMany(Registration, { foreignKey: 'userId' });
@@ -38,12 +40,10 @@ Guest.belongsTo(Event, {
     as: 'event'
 });
 
-// Opportunity has many Applicants
-Opportunity.hasMany(Applicant, {
-    foreignKey: 'opportunityId',
-    as: 'applicants',
-    onDelete: 'CASCADE'
-});
+// Opportunity associations
+Opportunity.belongsTo(User, { foreignKey: 'authorId', as: 'author' });
+Opportunity.belongsTo(OpportunityCategory, { foreignKey: 'categoryId', as: 'category' });
+Opportunity.hasMany(Applicant, { foreignKey: 'opportunityId', as: 'applicants' });
 
 // Applicant belongs to an Opportunity
 Applicant.belongsTo(Opportunity, {
@@ -52,8 +52,8 @@ Applicant.belongsTo(Opportunity, {
 });
 
 // An Event belongsTo its organizer
-Event.belongsTo(User,    { foreignKey: 'organizerId', as: 'organizer' });
-User.hasMany(Event,      { foreignKey: 'organizerId', as: 'events' });
+Event.belongsTo(User, { foreignKey: 'organizerId', as: 'organizer' });
+User.hasMany(Event, { foreignKey: 'organizerId', as: 'events' });
 
 // News belongs to a Category
 News.belongsTo(Category, {
@@ -67,7 +67,8 @@ Category.hasMany(News, {
     as: 'news'
 });
 
-// Add other associations as needed
+// OpportunityCategory associations
+OpportunityCategory.hasMany(Opportunity, { foreignKey: 'categoryId', as: 'opportunities' });
 
 export default {
   User,
@@ -79,6 +80,6 @@ export default {
   Opportunity,
   Applicant,
   News,
-  Category
-  // Add other models
+  Category,
+  OpportunityCategory
 }; 

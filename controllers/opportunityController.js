@@ -1,5 +1,6 @@
 import Opportunity from '../models/Opportunity.js';
 import Applicant from '../models/Applicant.js';
+import OpportunityCategory from '../models/OpportunityCategory.js';
 import { Op, ValidationError, UniqueConstraintError } from 'sequelize';
 import sequelize from '../config/database.js';
 
@@ -223,5 +224,123 @@ export const deleteOpportunity = async (req, res) => {
         res.json({ message: 'Opportunity deleted successfully' });
     } catch (error) {
         res.status(500).json({ message: 'Error deleting opportunity', error: error.message });
+    }
+};
+
+// Get opportunities by category name
+export const getOpportunitiesByCategory = async (req, res) => {
+    try {
+        const { categoryName } = req.params;
+        const { status, includeStats } = req.query;
+        const { limit, offset } = req.pagination || { limit: 10, offset: 0 };
+
+        // Find the category by name
+        const category = await OpportunityCategory.findOne({
+            where: {
+                name: {
+                    [Op.iLike]: categoryName // Case-insensitive search
+                }
+            }
+        });
+
+        if (!category) {
+            return res.status(404).json({ message: 'Category not found' });
+        }
+
+        // Build filter conditions
+        const where = { categoryId: category.id };
+        if (status) {
+            where.status = status;
+        }
+
+        // Get opportunities with pagination
+        const { count, rows: opportunities } = await Opportunity.findAndCountAll({
+            where,
+            order: [['createdAt', 'DESC']],
+            limit,
+            offset,
+            include: [
+                {
+                    model: Applicant,
+                    as: 'applicants',
+                    attributes: ['id']
+                },
+                {
+                    model: OpportunityCategory,
+                    as: 'category',
+                    attributes: ['id', 'name', 'description']
+                }
+            ]
+        });
+
+        // Calculate pagination metadata
+        const totalPages = Math.ceil(count / limit);
+        const currentPage = Math.floor(offset / limit) + 1;
+
+        // Prepare response
+        let response = {
+            opportunities,
+            pagination: {
+                total: count,
+                totalPages,
+                currentPage,
+                perPage: limit,
+                hasMore: currentPage < totalPages
+            }
+        };
+
+        // Include stats if requested
+        if (includeStats === 'true') {
+            const now = new Date();
+
+            // Get stats for this category
+            const [
+                totalOpportunities,
+                activeOpportunities,
+                byStatus,
+                popularOpportunities
+            ] = await Promise.all([
+                Opportunity.count({ where: { categoryId: category.id } }),
+                Opportunity.count({
+                    where: {
+                        categoryId: category.id,
+                        status: 'open',
+                        deadline: { [Op.gt]: now }
+                    }
+                }),
+                Opportunity.findAll({
+                    attributes: ['status', [sequelize.fn('COUNT', sequelize.col('id')), 'count']],
+                    where: { categoryId: category.id },
+                    group: ['status']
+                }),
+                Opportunity.findAll({
+                    attributes: [
+                        'id',
+                        'title',
+                        [sequelize.fn('COUNT', sequelize.col('applicants.id')), 'applicantCount']
+                    ],
+                    where: { categoryId: category.id },
+                    include: [{ model: Applicant, as: 'applicants', attributes: [] }],
+                    group: ['Opportunity.id'],
+                    order: [[sequelize.fn('COUNT', sequelize.col('applicants.id')), 'DESC']],
+                    limit: 5
+                })
+            ]);
+
+            response.stats = {
+                totalOpportunities,
+                activeOpportunities,
+                byStatus,
+                popularOpportunities
+            };
+        }
+
+        res.status(200).json(response);
+    } catch (error) {
+        console.error('Error fetching opportunities by category:', error);
+        res.status(500).json({
+            message: 'Error fetching opportunities by category',
+            error: error.message
+        });
     }
 }; 

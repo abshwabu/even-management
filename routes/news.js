@@ -6,7 +6,8 @@ import {
     getNewsById,
     createNews,
     updateNews,
-    deleteNews
+    deleteNews,
+    getNewsByCategory
 } from '../controllers/newsController.js';
 import pagination from '../middleware/pagination.js';
 import multer from 'multer';
@@ -186,6 +187,57 @@ router.get('/', pagination, getAllNews);
  *         description: News not found
  */
 router.get('/:id', getNewsById);
+
+/**
+ * @swagger
+ * /api/news/category/{categoryName}:
+ *   get:
+ *     tags: [News]
+ *     summary: Get news articles by category name
+ *     parameters:
+ *       - in: path
+ *         name: categoryName
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Name of the category
+ *       - in: query
+ *         name: status
+ *         schema:
+ *           type: string
+ *           enum: [draft, published, archived]
+ *         description: Filter by status
+ *     responses:
+ *       200:
+ *         description: List of news articles in the specified category
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 news:
+ *                   type: array
+ *                   items:
+ *                     $ref: '#/components/schemas/News'
+ *                 pagination:
+ *                   type: object
+ *                   properties:
+ *                     total:
+ *                       type: integer
+ *                     totalPages:
+ *                       type: integer
+ *                     currentPage:
+ *                       type: integer
+ *                     perPage:
+ *                       type: integer
+ *                     hasMore:
+ *                       type: boolean
+ *       404:
+ *         description: Category not found
+ *       500:
+ *         description: Server error
+ */
+router.get('/category/:categoryName', pagination, getNewsByCategory);
 
 // Protected routes
 router.use(auth);

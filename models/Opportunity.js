@@ -2,6 +2,11 @@ import { DataTypes } from 'sequelize';
 import sequelize from '../config/database.js';
 
 const Opportunity = sequelize.define('Opportunity', {
+    id: {
+        type: DataTypes.INTEGER,
+        primaryKey: true,
+        autoIncrement: true
+    },
     title: {
         type: DataTypes.STRING,
         allowNull: false,
@@ -21,16 +26,29 @@ const Opportunity = sequelize.define('Opportunity', {
     image: {
         type: DataTypes.STRING,
         allowNull: true,
+        get() {
+            const rawValue = this.getDataValue('image');
+            if (!rawValue) return null;
+            // If it's already a full URL, return as is
+            if (rawValue.startsWith('http://') || rawValue.startsWith('https://')) {
+                return rawValue;
+            }
+            // Otherwise, ensure it starts with a forward slash
+            return rawValue.startsWith('/') ? rawValue : `/${rawValue}`;
+        }
     },
     status: {
         type: DataTypes.ENUM('open', 'closed', 'draft'),
         allowNull: false,
         defaultValue: 'draft',
     },
-    type: {
-        type: DataTypes.ENUM('job', 'internship', 'volunteer', 'other'),
+    categoryId: {
+        type: DataTypes.INTEGER,
         allowNull: false,
-        defaultValue: 'other',
+        references: {
+            model: 'OpportunityCategories',
+            key: 'id'
+        }
     },
     location: {
         type: DataTypes.STRING,
@@ -61,6 +79,7 @@ const Opportunity = sequelize.define('Opportunity', {
     }
 }, {
     tableName: 'Opportunities',
+    timestamps: true
 });
 
 export default Opportunity; 

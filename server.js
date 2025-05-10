@@ -23,6 +23,7 @@ import opportunityRoutes from './routes/opportunity.js';
 import guestRoutes from './routes/guest.js';
 import applicantRoutes from './routes/applicant.js';
 import categoriesRoutes from './routes/categories.js';
+import opportunityCategoryRoutes from './routes/opportunityCategoryRoutes.js';
 
 const app = express();
 const port = process.env.PORT || 3000;
@@ -65,6 +66,7 @@ app.use('/api/opportunities', opportunityRoutes);
 app.use('/api', guestRoutes);
 app.use('/api', applicantRoutes);
 app.use('/api/categories', categoriesRoutes);
+app.use('/api/opportunity-categories', opportunityCategoryRoutes);
 app.use('/', swaggerRoutes); // Swagger documentation route
 
 // Serve static files from uploads directory
@@ -92,9 +94,14 @@ connectDB().catch(err => {
 sequelize.sync({ force: true })  // This will drop and recreate all tables
     .then(() => {
         console.log('Database schema synchronized successfully');
+        // Seed opportunity categories
+        return seedOpportunityCategories();
+    })
+    .then(() => {
+        console.log('Database initialization completed');
     })
     .catch(err => {
-        console.error('Error synchronizing database schema:', err);
+        console.error('Error initializing database:', err);
     });
 
 // Add a health check endpoint

@@ -293,4 +293,66 @@ export const deleteNews = async (req, res) => {
     } catch (error) {
         res.status(500).json({ message: 'Error deleting news', error: error.message });
     }
+};
+
+// Get news by category name
+export const getNewsByCategory = async (req, res) => {
+    try {
+        const { categoryName } = req.params;
+        const { status } = req.query;
+        const { limit, offset } = req.pagination || { limit: 10, offset: 0 };
+
+        // Find the category by name
+        const category = await Category.findOne({
+            where: {
+                name: {
+                    [Op.iLike]: categoryName // Case-insensitive search
+                }
+            }
+        });
+
+        if (!category) {
+            return res.status(404).json({ message: 'Category not found' });
+        }
+
+        // Build filter conditions
+        const where = { categoryId: category.id };
+        if (status) {
+            where.status = status;
+        }
+
+        // Get news with pagination
+        const { count, rows: news } = await News.findAndCountAll({
+            where,
+            include: [{
+                model: Category,
+                as: 'category',
+                attributes: ['id', 'name', 'description']
+            }],
+            order: [['publishedAt', 'DESC']],
+            limit,
+            offset
+        });
+
+        // Calculate pagination metadata
+        const totalPages = Math.ceil(count / limit);
+        const currentPage = Math.floor(offset / limit) + 1;
+
+        res.status(200).json({
+            news,
+            pagination: {
+                total: count,
+                totalPages,
+                currentPage,
+                perPage: limit,
+                hasMore: currentPage < totalPages
+            }
+        });
+    } catch (error) {
+        console.error('Error fetching news by category:', error);
+        res.status(500).json({
+            message: 'Error fetching news by category',
+            error: error.message
+        });
+    }
 }; 
