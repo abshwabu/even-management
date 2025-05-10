@@ -42,17 +42,6 @@ const sequelize = new Sequelize(dbUrl, {
 sequelize.authenticate()
   .then(() => {
     console.log('Database connection has been established successfully.');
-    
-    // Sync all models with the database
-    // In production, we use alter: true to be safe
-    // In development, we can use force: true to recreate tables
-    return sequelize.sync({ 
-      alter: isProduction,
-      force: !isProduction 
-    });
-  })
-  .then(() => {
-    console.log('Database schema synchronized successfully');
   })
   .catch(err => {
     console.error('Unable to connect to the database:', err);

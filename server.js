@@ -90,20 +90,6 @@ connectDB().catch(err => {
     // Continue running the server even if DB connection fails
 });
 
-// Sync database schema
-sequelize.sync({ force: true })  // This will drop and recreate all tables
-    .then(() => {
-        console.log('Database schema synchronized successfully');
-        // Seed opportunity categories
-        return seedOpportunityCategories();
-    })
-    .then(() => {
-        console.log('Database initialization completed');
-    })
-    .catch(err => {
-        console.error('Error initializing database:', err);
-    });
-
 // Add a health check endpoint
 app.get('/health', (req, res) => {
     res.status(200).send('OK');
