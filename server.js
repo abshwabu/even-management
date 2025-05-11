@@ -77,6 +77,59 @@ app.use('/uploads', express.static(path.join(__dirname, 'uploads'), {
     }
 }));
 
+// Debug route to check static file paths
+app.get('/check-static-path', (req, res) => {
+    const uploadDir = path.join(__dirname, 'uploads');
+    const newsDir = path.join(uploadDir, 'news');
+    const guestsDir = path.join(uploadDir, 'guests');
+    const eventsDir = path.join(uploadDir, 'events');
+    
+    // Check if directories exist
+    const dirInfo = {
+        uploadsExists: fs.existsSync(uploadDir),
+        newsExists: fs.existsSync(newsDir),
+        guestsExists: fs.existsSync(guestsDir),
+        eventsExists: fs.existsSync(eventsDir),
+        uploadPath: uploadDir,
+        staticMountPoint: '/uploads'
+    };
+    
+    // List some files if directories exist
+    if (dirInfo.newsExists) {
+        try {
+            dirInfo.newsFiles = fs.readdirSync(newsDir).slice(0, 5); // Get first 5 files
+        } catch (err) {
+            dirInfo.newsError = err.message;
+        }
+    }
+    
+    if (dirInfo.guestsExists) {
+        try {
+            dirInfo.guestsFiles = fs.readdirSync(guestsDir).slice(0, 5);
+        } catch (err) {
+            dirInfo.guestsError = err.message;
+        }
+    }
+    
+    if (dirInfo.eventsExists) {
+        try {
+            dirInfo.eventsFiles = fs.readdirSync(eventsDir).slice(0, 5);
+        } catch (err) {
+            dirInfo.eventsError = err.message;
+        }
+    }
+    
+    res.json({
+        message: 'Static file configuration',
+        info: dirInfo,
+        accessUrls: {
+            news: dirInfo.newsFiles?.map(file => `/uploads/news/${file}`),
+            guests: dirInfo.guestsFiles?.map(file => `/uploads/guests/${file}`),
+            events: dirInfo.eventsFiles?.map(file => `/uploads/events/${file}`)
+        }
+    });
+});
+
 // Serve static files from public directory
 app.use(express.static(path.join(__dirname, 'public')));
 

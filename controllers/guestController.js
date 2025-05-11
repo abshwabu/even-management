@@ -50,6 +50,13 @@ export const getGuestsByEventId = async (req, res) => {
 // Create a new guest
 export const createGuest = async (req, res) => {
     try {
+        console.log('Creating guest with request:', {
+            body: req.body,
+            file: req.file,
+            params: req.params,
+            originalUrl: req.originalUrl
+        });
+        
         const { eventId } = req.params;
         // pull out any image string
         const { image: imageFromBody, name, profession, description } = req.body;
@@ -64,11 +71,16 @@ export const createGuest = async (req, res) => {
         const guestData = { name, profession, description, eventId };
         if (req.file) {
             guestData.image = `/uploads/guests/${req.file.filename}`;
+            console.log('Using uploaded file for image:', guestData.image);
         } else if (typeof imageFromBody === 'string' && imageFromBody.trim()) {
             guestData.image = imageFromBody.trim();
+            console.log('Using image from body:', guestData.image);
+        } else {
+            console.log('No image provided');
         }
 
         const guest = await Guest.create(guestData);
+        console.log('Guest created successfully:', guest.toJSON());
         return res.status(201).json(guest);
     } catch (error) {
         console.error('Error creating guest:', error);
@@ -93,6 +105,13 @@ export const createGuest = async (req, res) => {
 // Update a guest
 export const updateGuest = async (req, res) => {
     try {
+        console.log('Updating guest with request:', {
+            body: req.body,
+            file: req.file,
+            params: req.params,
+            originalUrl: req.originalUrl
+        });
+        
         const { id } = req.params;
         // pull out image, drop membership
         const {
@@ -114,11 +133,16 @@ export const updateGuest = async (req, res) => {
         const updateData = { ...restFields };
         if (req.file) {
             updateData.image = `/uploads/guests/${req.file.filename}`;
+            console.log('Using uploaded file for image:', updateData.image);
         } else if (typeof imageFromBody === 'string' && imageFromBody.trim()) {
             updateData.image = imageFromBody.trim();
+            console.log('Using image from body:', updateData.image);
+        } else {
+            console.log('No image update provided');
         }
 
         await guest.update(updateData);
+        console.log('Guest updated successfully:', guest.toJSON());
         return res.status(200).json(guest);
     } catch (error) {
         console.error('Error updating guest:', error);

@@ -17,9 +17,14 @@ router.use(express.urlencoded({ extended: true }));
 
 function optionalMulter(req, res, next) {
     const ct = req.headers['content-type'] || '';
+    console.log('Guest route - Content-Type:', ct);
+    console.log('Guest route - URL:', req.originalUrl);
+    
     if (ct.startsWith('multipart/form-data')) {
+        console.log('Using multer for file upload');
         return upload.single('image')(req, res, next);
     }
+    console.log('Skipping multer, not a multipart request');
     next();
 }
 

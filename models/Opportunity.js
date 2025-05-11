@@ -1,5 +1,6 @@
 import { DataTypes } from 'sequelize';
 import sequelize from '../config/database.js';
+import path from 'path';
 
 const Opportunity = sequelize.define('Opportunity', {
     id: {
@@ -29,12 +30,27 @@ const Opportunity = sequelize.define('Opportunity', {
         get() {
             const rawValue = this.getDataValue('image');
             if (!rawValue) return null;
+            
+            // Debug the raw value
+            console.log('Opportunity image raw value:', rawValue);
+            
             // If it's already a full URL, return as is
             if (rawValue.startsWith('http://') || rawValue.startsWith('https://')) {
                 return rawValue;
             }
-            // Otherwise, ensure it starts with a forward slash
-            return rawValue.startsWith('/') ? rawValue : `/${rawValue}`;
+            
+            // Remove /api/ prefix if it exists
+            let cleanPath = rawValue;
+            if (cleanPath.startsWith('/api/')) {
+                cleanPath = cleanPath.substring(4); // Remove '/api'
+            }
+            
+            // Ensure path starts with /uploads/ if needed
+            if (!cleanPath.startsWith('/uploads/')) {
+                cleanPath = `/uploads/opportunities/${path.basename(cleanPath)}`;
+            }
+            
+            return cleanPath;
         }
     },
     status: {

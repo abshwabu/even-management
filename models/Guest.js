@@ -2,6 +2,7 @@ import { DataTypes } from 'sequelize';
 import sequelize from '../config/database.js';
 // Don't import Event here to avoid circular dependencies
 // import Event from './Event.js';
+import path from 'path';
 
 const Guest = sequelize.define('Guest', {
     id: {
@@ -24,6 +25,31 @@ const Guest = sequelize.define('Guest', {
     image: {
         type: DataTypes.STRING,
         allowNull: true,
+        get() {
+            const rawValue = this.getDataValue('image');
+            if (!rawValue) return null;
+            
+            // Debug the raw value
+            console.log('Guest image raw value:', rawValue);
+            
+            // If it's already a full URL, return as is
+            if (rawValue.startsWith('http://') || rawValue.startsWith('https://')) {
+                return rawValue;
+            }
+            
+            // Remove /api/ prefix if it exists
+            let cleanPath = rawValue;
+            if (cleanPath.startsWith('/api/')) {
+                cleanPath = cleanPath.substring(4); // Remove '/api'
+            }
+            
+            // Ensure path starts with /uploads/ if needed
+            if (!cleanPath.startsWith('/uploads/')) {
+                cleanPath = `/uploads/guests/${path.basename(cleanPath)}`;
+            }
+            
+            return cleanPath;
+        }
     },
     eventId: {
         type: DataTypes.INTEGER,
