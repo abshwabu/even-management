@@ -17,12 +17,17 @@ const Guest = sequelize.define('Guest', {
         type: DataTypes.STRING,
         allowNull: true,
     },
+    description: {
+        type: DataTypes.TEXT,
+        allowNull: true
+    },
     image: {
         type: DataTypes.STRING,
         allowNull: true,
     },
     eventId: {
         type: DataTypes.INTEGER,
+        allowNull: false,
         references: {
             model: 'Events',
             key: 'id'

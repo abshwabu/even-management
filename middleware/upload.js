@@ -5,7 +5,24 @@ import fs from 'fs';
 // Configure storage
 const storage = multer.diskStorage({
     destination: function (req, file, cb) {
-        cb(null, 'uploads/events/');
+        // Determine the upload directory based on the route
+        let uploadDir = 'uploads/';
+        if (req.originalUrl.includes('/events/')) {
+            uploadDir += 'events/';
+        } else if (req.originalUrl.includes('/guests/')) {
+            uploadDir += 'guests/';
+        } else if (req.originalUrl.includes('/news/')) {
+            uploadDir += 'news/';
+        } else if (req.originalUrl.includes('/opportunities/')) {
+            uploadDir += 'opportunities/';
+        }
+        
+        // Create directory if it doesn't exist
+        if (!fs.existsSync(uploadDir)) {
+            fs.mkdirSync(uploadDir, { recursive: true });
+        }
+        
+        cb(null, uploadDir);
     },
     filename: function (req, file, cb) {
         const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
@@ -23,7 +40,7 @@ const fileFilter = (req, file, cb) => {
     cb(null, true);
 };
 
-// Configure multer
+// Create multer upload instance
 const upload = multer({
     storage: storage,
     fileFilter: fileFilter,

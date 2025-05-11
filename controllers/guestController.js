@@ -7,6 +7,7 @@ import { ValidationError, UniqueConstraintError } from 'sequelize';
 export const getAllGuests = async (req, res) => {
     try {
         const guests = await Guest.findAll({
+            attributes: ['id', 'name', 'profession', 'description', 'image', 'eventId', 'createdAt', 'updatedAt'],
             include: [{ model: Event, as: 'event' }]
         });
         res.status(200).json(guests);
@@ -31,6 +32,7 @@ export const getGuestsByEventId = async (req, res) => {
         }
         
         const guests = await Guest.findAll({
+            attributes: ['id', 'name', 'profession', 'description', 'image', 'eventId', 'createdAt', 'updatedAt'],
             where: { eventId },
             include: [{ model: Event, as: 'event' }]
         });

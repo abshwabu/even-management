@@ -35,7 +35,9 @@ const sequelize = new Sequelize(dbUrl, {
     min: 0,
     acquire: 30000,
     idle: 10000
-  }
+  },
+  // Temporarily enable sync to add the description column
+  sync: { alter: true }
 });
 
 // Test the connection immediately

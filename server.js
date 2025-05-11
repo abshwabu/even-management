@@ -69,8 +69,13 @@ app.use('/api/categories', categoriesRoutes);
 app.use('/api/opportunity-categories', opportunityCategoryRoutes);
 app.use('/', swaggerRoutes); // Swagger documentation route
 
-// Serve static files from uploads directory
-app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+// Serve static files from uploads directory with proper path configuration
+app.use('/uploads', express.static(path.join(__dirname, 'uploads'), {
+    setHeaders: (res, path) => {
+        res.set('Cross-Origin-Resource-Policy', 'cross-origin');
+        res.set('Cache-Control', 'public, max-age=31536000'); // Cache for 1 year
+    }
+}));
 
 // Serve static files from public directory
 app.use(express.static(path.join(__dirname, 'public')));
@@ -89,6 +94,15 @@ connectDB().catch(err => {
     console.error('Failed to connect to database:', err);
     // Continue running the server even if DB connection fails
 });
+
+// Sync database schema to add description column
+sequelize.sync({ alter: true })
+    .then(() => {
+        console.log('Database schema synchronized successfully');
+    })
+    .catch(err => {
+        console.error('Error synchronizing database schema:', err);
+    });
 
 // Add a health check endpoint
 app.get('/health', (req, res) => {
