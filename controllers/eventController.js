@@ -172,14 +172,83 @@ export const createEvent = async (req, res) => {
         const { 
             mainImage: mainImageFromBody, 
             images: imagesFromBody,
+            location,
             ...restBody 
         } = req.body;
+
+        console.log('Location data received in createEvent:', location);
+        console.log('Request body:', req.body);
 
         // build payload
         const eventData = {
             ...restBody,
             organizerId: req.user.id
         };
+
+        // Process location data if provided
+        if (location) {
+            console.log('Processing location data:', location, 'Type:', typeof location);
+            
+            // If location is provided as a string like "lat,lng"
+            if (typeof location === 'string' && location.includes(',')) {
+                const [lat, lng] = location.split(',').map(coord => parseFloat(coord.trim()));
+                console.log('Parsed location from string:', lat, lng);
+                eventData.location = {
+                    city: restBody.city || "",
+                    place: restBody.place || "",
+                    position: {
+                        lat: lat || 0,
+                        lng: lng || 0
+                    }
+                };
+            } 
+            // If location is provided as an array [lat, lng]
+            else if (Array.isArray(location) && location.length === 2) {
+                console.log('Location is an array:', location);
+                eventData.location = {
+                    city: restBody.city || "",
+                    place: restBody.place || "",
+                    position: {
+                        lat: Number(location[0]) || 0,
+                        lng: Number(location[1]) || 0
+                    }
+                };
+            }
+            // If location is already a properly formatted object
+            else if (typeof location === 'object' && location.position) {
+                console.log('Location is an object with position:', location);
+                eventData.location = {
+                    city: restBody.city || location.city || "",
+                    place: restBody.place || location.place || "",
+                    position: {
+                        lat: Number(location.position.lat) || 0,
+                        lng: Number(location.position.lng) || 0
+                    }
+                };
+            } else {
+                console.log('Location format not recognized, using default');
+                eventData.location = {
+                    city: restBody.city || "",
+                    place: restBody.place || "",
+                    position: {
+                        lat: 0,
+                        lng: 0
+                    }
+                };
+            }
+        } else {
+            console.log('No location data provided');
+            eventData.location = {
+                city: restBody.city || "",
+                place: restBody.place || "",
+                position: {
+                    lat: 0,
+                    lng: 0
+                }
+            };
+        }
+
+        console.log('Final location data for event:', eventData.location);
 
         // handle main image
         if (req.files?.mainImage) {
@@ -223,7 +292,9 @@ export const createEvent = async (req, res) => {
             isRead: false
         });
 
-        return res.status(201).json(formatEvent(event));
+        const formattedEvent = formatEvent(event);
+        console.log('Formatted event before sending response:', formattedEvent);
+        return res.status(201).json(formattedEvent);
     } catch (error) {
         console.error('Error creating event:', error);
         if (
@@ -255,15 +326,91 @@ export const updateEvent = async (req, res) => {
             return res.status(403).json({ message: 'Not authorized to edit this event' });
         }
 
+        console.log('Update event request body:', req.body);
+
         // pull out image fields and block organizerId
         const {
             organizerId: _ignore,
             mainImage: mainImageFromBody,
             images: imagesFromBody,
+            location,
+            city,
+            place,
             ...restFields
         } = req.body;
 
         const updateData = { ...restFields };
+
+        // Process location data if provided
+        if (location) {
+            console.log('Processing location data in update:', location, 'Type:', typeof location);
+            
+            // If location is provided as a string like "lat,lng"
+            if (typeof location === 'string' && location.includes(',')) {
+                const [lat, lng] = location.split(',').map(coord => parseFloat(coord.trim()));
+                console.log('Parsed location from string:', lat, lng);
+                updateData.location = {
+                    city: city || "",
+                    place: place || "",
+                    position: {
+                        lat: lat || 0,
+                        lng: lng || 0
+                    }
+                };
+            } 
+            // If location is provided as an array [lat, lng]
+            else if (Array.isArray(location) && location.length === 2) {
+                console.log('Location is an array:', location);
+                updateData.location = {
+                    city: city || "",
+                    place: place || "",
+                    position: {
+                        lat: Number(location[0]) || 0,
+                        lng: Number(location[1]) || 0
+                    }
+                };
+            }
+            // If location is already a properly formatted object
+            else if (typeof location === 'object' && location.position) {
+                console.log('Location is an object with position:', location);
+                updateData.location = {
+                    city: city || location.city || "",
+                    place: place || location.place || "",
+                    position: {
+                        lat: Number(location.position.lat) || 0,
+                        lng: Number(location.position.lng) || 0
+                    }
+                };
+            } else {
+                console.log('Location format not recognized in update, using default');
+                updateData.location = {
+                    city: city || "",
+                    place: place || "",
+                    position: {
+                        lat: 0,
+                        lng: 0
+                    }
+                };
+            }
+        } else if (city || place) {
+            // If only city or place is provided, update those but keep existing lat/lng
+            let currentLocation = event.getDataValue('location') || { position: { lat: 0, lng: 0 } };
+            if (typeof currentLocation === 'string') {
+                try { 
+                    currentLocation = JSON.parse(currentLocation);
+                } catch { 
+                    currentLocation = { position: { lat: 0, lng: 0 } }; 
+                }
+            }
+            
+            updateData.location = {
+                city: city || currentLocation.city || "",
+                place: place || currentLocation.place || "",
+                position: currentLocation.position || { lat: 0, lng: 0 }
+            };
+        }
+
+        console.log('Final location data for update:', updateData.location);
 
         // handle main image
         if (req.files?.mainImage) {
@@ -289,7 +436,9 @@ export const updateEvent = async (req, res) => {
         }
 
         await event.update(updateData);
-        return res.json(event);
+        const formattedEvent = formatEvent(event);
+        console.log('Formatted event before sending update response:', formattedEvent);
+        return res.json(formattedEvent);
     } catch (error) {
         console.error('Error updating event:', error);
         if (
@@ -369,28 +518,58 @@ export const deleteEvent = async (req, res) => {
  * Convert an Event instance into JSON:
  *  - strip out the raw JSON column
  *  - re-inject city/place
- *  - return `location` as "lat,lng" string
+ *  - return `location` as array with lat/lng values
  */
 function formatEvent(event) {
+  console.log('formatEvent called with event:', event.id);
+  
   // 1) grab raw JSON column (may be string or object)
   let rawLoc = event.getDataValue('location');
-  if (typeof rawLoc === 'string') {
-    try { rawLoc = JSON.parse(rawLoc); }
-    catch { rawLoc = { position:{lat:null,lng:null} }; }
+  console.log('Raw location value:', rawLoc, 'Type:', typeof rawLoc);
+  
+  // Handle different location formats
+  if (!rawLoc) {
+    console.log('No location data found');
+    rawLoc = { city: "", place: "", position: { lat: 0, lng: 0 } };
+  } else if (typeof rawLoc === 'string') {
+    try { 
+      rawLoc = JSON.parse(rawLoc);
+      console.log('Parsed location from string:', rawLoc); 
+    } catch (e) { 
+      console.log('Failed to parse location string:', e);
+      rawLoc = { city: "", place: "", position: { lat: 0, lng: 0 } }; 
+    }
   }
 
-  // 2) extract lat/lng
+  // 2) extract lat/lng with proper number conversion
   const pos = rawLoc.position || {};
-  const location = [ pos.lat ?? null, pos.lng ?? null ];
+  console.log('Position object:', pos);
+  
+  // Convert to numbers and use 0 as fallback
+  const lat = pos.lat !== undefined && pos.lat !== null ? Number(pos.lat) : 0;
+  const lng = pos.lng !== undefined && pos.lng !== null ? Number(pos.lng) : 0;
+  
+  console.log('Extracted lat/lng:', lat, lng);
+  
+  const location = [lat, lng];
 
   // 3) build final object
   const obj = event.get({ plain: true });
+  
+  // Add city and place if they exist in the location object
+  if (rawLoc.city) obj.city = rawLoc.city;
+  if (rawLoc.place) obj.place = rawLoc.place;
+  
+  // Remove internal location representation
   delete obj.location;
   delete obj.lat;
   delete obj.lng;
 
-  return {
+  const result = {
     ...obj,
     location
   };
+  
+  console.log('Final formatted event location:', result.location);
+  return result;
 } 

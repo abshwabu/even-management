@@ -19,7 +19,7 @@ const options = {
     },
     servers: [
       {
-        url: process.env.API_URL || 'https://event-management-zk4x.onrender.com',
+        url: process.env.API_URL ? process.env.API_URL : 'http://localhost:3000',
         description: process.env.API_URL ? 'Development server' : 'Production server',
       },
     ],
