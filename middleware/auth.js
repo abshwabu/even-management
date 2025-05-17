@@ -19,6 +19,25 @@ const auth = async (req, res, next) => {
     }
 };
 
+const optionalAuth = async (req, res, next) => {
+    try {
+        const authHeader = req.header('Authorization');
+        if (authHeader) {
+            const token = authHeader.replace('Bearer ', '');
+            const decoded = jwt.verify(token, process.env.JWT_SECRET);
+            const user = await User.findOne({ where: { id: decoded.userId } });
+            
+            if (user) {
+                req.user = user;
+            }
+        }
+        next();
+    } catch (error) {
+        // Continue without user authentication
+        next();
+    }
+};
+
 const restrictTo = (roles) => {
     return (req, res, next) => {
         if (!roles.includes(req.user.role)) {
@@ -28,4 +47,4 @@ const restrictTo = (roles) => {
     };
 };
 
-export { restrictTo, auth };
+export { restrictTo, auth, optionalAuth };

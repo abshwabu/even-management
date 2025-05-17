@@ -1,6 +1,6 @@
 import express from 'express';
 import multer from 'multer';
-import { auth } from '../middleware/auth.js';
+import { auth, optionalAuth } from '../middleware/auth.js';
 import upload from '../middleware/upload.js';
 import {
     getAllOpportunities,
@@ -10,6 +10,7 @@ import {
     deleteOpportunity,
     getOpportunitiesByCategory
 } from '../controllers/opportunityController.js';
+import { applyForOpportunity } from '../controllers/applicantController.js';
 import pagination from '../middleware/pagination.js';
 
 const router = express.Router();
@@ -305,6 +306,51 @@ router.get('/:id', getOpportunityById);
  *         description: Server error
  */
 router.get('/category/:categoryName', pagination, getOpportunitiesByCategory);
+
+/**
+ * @swagger
+ * /api/opportunities/{opportunityId}/apply:
+ *   post:
+ *     summary: Apply for an opportunity
+ *     tags: [Applicants]
+ *     parameters:
+ *       - in: path
+ *         name: opportunityId
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         description: Opportunity ID
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         multipart/form-data:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - name
+ *               - email
+ *             properties:
+ *               name:
+ *                 type: string
+ *               email:
+ *                 type: string
+ *                 format: email
+ *               phone:
+ *                 type: string
+ *               coverLetter:
+ *                 type: string
+ *               resume:
+ *                 type: string
+ *                 format: binary
+ *     responses:
+ *       201:
+ *         description: Application submitted successfully
+ *       400:
+ *         description: Bad request or already applied
+ *       404:
+ *         description: Opportunity not found
+ */
+router.post('/:opportunityId/apply', optionalAuth, upload.single('resume'), applyForOpportunity);
 
 // Protected routes
 router.use(auth);

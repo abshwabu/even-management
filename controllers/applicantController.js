@@ -106,18 +106,41 @@ export const applyForOpportunity = async (req, res) => {
             return res.status(400).json({ message: 'This opportunity is not open for applications' });
         }
         
-        // Check if user has already applied
-        if (req.user) {
-            const existingApplication = await Applicant.findOne({
-                where: {
-                    opportunityId,
-                    userId: req.user.id
-                }
-            });
-            
-            if (existingApplication) {
-                return res.status(400).json({ message: 'You have already applied for this opportunity' });
+        // Validate required fields
+        const { name, email, phone } = req.body;
+        const validationErrors = [];
+        
+        if (!name || name.trim() === '') {
+            validationErrors.push('Name is required');
+        }
+        
+        if (!email || email.trim() === '') {
+            validationErrors.push('Email is required');
+        } else {
+            // Simple email validation
+            const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+            if (!emailRegex.test(email)) {
+                validationErrors.push('Invalid email format');
             }
+        }
+        
+        if (validationErrors.length > 0) {
+            return res.status(400).json({ 
+                message: 'Validation error', 
+                errors: validationErrors 
+            });
+        }
+        
+        // Check if the email has already been used to apply for this opportunity
+        const existingApplication = await Applicant.findOne({
+            where: {
+                opportunityId,
+                email
+            }
+        });
+        
+        if (existingApplication) {
+            return res.status(400).json({ message: 'An application with this email already exists for this opportunity' });
         }
         
         const applicationData = {

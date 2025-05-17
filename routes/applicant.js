@@ -1,10 +1,9 @@
 import express from 'express';
-import { auth, restrictTo } from '../middleware/auth.js';
+import { auth, restrictTo, optionalAuth } from '../middleware/auth.js';
 import upload from '../middleware/upload.js';
 import {
     getOpportunityApplicants,
     getApplicantById,
-    applyForOpportunity,
     updateApplicationStatus,
     deleteApplication
 } from '../controllers/applicantController.js';
@@ -72,51 +71,6 @@ router.get('/opportunities/:opportunityId/applicants', auth, pagination, getOppo
  *         description: Server error
  */
 router.get('/applicants/:id', auth, getApplicantById);
-
-/**
- * @swagger
- * /api/opportunities/{opportunityId}/apply:
- *   post:
- *     summary: Apply for an opportunity
- *     tags: [Applicants]
- *     parameters:
- *       - in: path
- *         name: opportunityId
- *         required: true
- *         schema:
- *           type: integer
- *         description: Opportunity ID
- *     requestBody:
- *       required: true
- *       content:
- *         multipart/form-data:
- *           schema:
- *             type: object
- *             required:
- *               - name
- *               - email
- *             properties:
- *               name:
- *                 type: string
- *               email:
- *                 type: string
- *                 format: email
- *               phone:
- *                 type: string
- *               coverLetter:
- *                 type: string
- *               resume:
- *                 type: string
- *                 format: binary
- *     responses:
- *       201:
- *         description: Application submitted successfully
- *       400:
- *         description: Bad request or already applied
- *       404:
- *         description: Opportunity not found
- */
-router.post('/opportunities/:opportunityId/apply', upload.single('resume'), applyForOpportunity);
 
 /**
  * @swagger
