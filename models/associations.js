@@ -16,6 +16,7 @@ Event.associations = {};
 Guest.associations = {};
 User.associations = {};
 Registration.associations = {};
+Payment.associations = {};
 Opportunity.associations = {};
 Applicant.associations = {};
 News.associations = {};
@@ -28,6 +29,10 @@ Registration.belongsTo(User, { foreignKey: 'userId', as: 'user' });
 
 Event.hasMany(Registration, { foreignKey: 'eventId' });
 Registration.belongsTo(Event, { foreignKey: 'eventId', as: 'event' });
+
+// Define Payment-Registration association
+Registration.hasMany(Payment, { foreignKey: 'registrationId' });
+Payment.belongsTo(Registration, { foreignKey: 'registrationId', as: 'registration' });
 
 // Define the Event-Guest association
 Event.hasMany(Guest, { 
@@ -49,6 +54,17 @@ Opportunity.hasMany(Applicant, { foreignKey: 'opportunityId', as: 'applicants' }
 Applicant.belongsTo(Opportunity, {
     foreignKey: 'opportunityId',
     as: 'opportunity'
+});
+
+// Applicant belongs to a User
+Applicant.belongsTo(User, {
+    foreignKey: 'userId',
+    as: 'user'
+});
+
+User.hasMany(Applicant, {
+    foreignKey: 'userId',
+    as: 'applications'
 });
 
 // An Event belongsTo its organizer

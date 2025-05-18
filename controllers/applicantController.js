@@ -1,7 +1,9 @@
 import Applicant from '../models/Applicant.js';
 import Opportunity from '../models/Opportunity.js';
 import User from '../models/User.js';
-import { Op } from 'sequelize';
+import { Op, Sequelize } from 'sequelize';
+import sequelize from '../config/database.js';
+import OpportunityCategory from '../models/OpportunityCategory.js';
 
 // Get all applicants for an opportunity
 export const getOpportunityApplicants = async (req, res) => {
@@ -244,17 +246,23 @@ export const getAllApplicants = async (req, res) => {
         const include = [{
             model: Opportunity,
             as: 'opportunity',
-            attributes: ['id', 'title', 'category', 'deadline']
+            attributes: ['id', 'title', 'categoryId', 'deadline'],
+            include: [{
+                model: OpportunityCategory,
+                as: 'category',
+                attributes: ['id', 'name'],
+                where: category ? { name: category } : undefined
+            }]
+        }, {
+            model: User,
+            as: 'user',
+            attributes: ['id', 'name', 'email']
         }];
-        
-        if (category) {
-            include[0].where = { category };
-        }
         
         // Get applicants with pagination
         const { count, rows: applicants } = await Applicant.findAndCountAll({
             where,
-            order: [['applicationDate', 'DESC']],
+            order: [['createdAt', 'DESC']],
             limit,
             offset,
             include
@@ -287,18 +295,23 @@ export const getAllApplicants = async (req, res) => {
                 group: ['status']
             });
             
-            // Get applicants by category (requires joining with Opportunity)
+            // Get applicants by category - using proper join
             const applicantsByCategory = await Applicant.findAll({
                 attributes: [
-                    [sequelize.col('opportunity.category'), 'category'],
+                    [sequelize.literal('"opportunity->category"."name"'), 'category'],
                     [sequelize.fn('COUNT', sequelize.col('Applicant.id')), 'count']
                 ],
                 include: [{
                     model: Opportunity,
                     as: 'opportunity',
-                    attributes: []
+                    attributes: [],
+                    include: [{
+                        model: OpportunityCategory,
+                        as: 'category',
+                        attributes: []
+                    }]
                 }],
-                group: [sequelize.col('opportunity.category')]
+                group: [sequelize.literal('"opportunity->category"."name"')]
             });
             
             // Get recent applicants (last 7 days)
@@ -307,7 +320,7 @@ export const getAllApplicants = async (req, res) => {
             
             const recentApplicantsCount = await Applicant.count({
                 where: {
-                    applicationDate: {
+                    createdAt: {
                         [Op.gte]: lastWeek
                     }
                 }

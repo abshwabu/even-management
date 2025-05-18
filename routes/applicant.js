@@ -5,7 +5,8 @@ import {
     getOpportunityApplicants,
     getApplicantById,
     updateApplicationStatus,
-    deleteApplication
+    deleteApplication,
+    getAllApplicants
 } from '../controllers/applicantController.js';
 import pagination from '../middleware/pagination.js';
 
@@ -44,6 +45,41 @@ const router = express.Router();
  *         description: Server error
  */
 router.get('/opportunities/:opportunityId/applicants', auth, pagination, getOpportunityApplicants);
+
+/**
+ * @swagger
+ * /api/applicants:
+ *   get:
+ *     summary: Get all applicants
+ *     tags: [Applicants]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: status
+ *         required: false
+ *         schema:
+ *           type: string
+ *         description: Filter by application status
+ *       - in: query
+ *         name: category
+ *         required: false
+ *         schema:
+ *           type: string
+ *         description: Filter by opportunity category
+ *       - in: query
+ *         name: includeStats
+ *         required: false
+ *         schema:
+ *           type: boolean
+ *         description: Include application statistics
+ *     responses:
+ *       200:
+ *         description: List of applicants with optional stats
+ *       500:
+ *         description: Server error
+ */
+router.get('/applicants', auth, restrictTo('admin'), pagination, getAllApplicants);
 
 /**
  * @swagger
